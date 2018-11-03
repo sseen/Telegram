@@ -8,11 +8,7 @@
 
 #import "TGAudioMessageViewModel.h"
 
-#import "TGImageUtils.h"
-#import "TGMessage.h"
-#import "TGPeerIdAdapter.h"
-
-#import "TGFont.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGModernViewContext.h"
 #import "TGTelegraphConversationMessageAssetsSource.h"
@@ -28,7 +24,7 @@
 
 #import "TGAudioSliderView.h"
 #import "TGModernViewInlineMediaContext.h"
-#import "TGDoubleTapGestureRecognizer.h"
+#import <LegacyComponents/TGDoubleTapGestureRecognizer.h>
 
 #import "TGReplyHeaderModel.h"
 
@@ -45,6 +41,10 @@
 #import "TGDocumentMessageIconView.h"
 
 #import "TGReusableLabel.h"
+
+#import "TGAudioMediaAttachment+Telegraph.h"
+
+#import "TGPresentation.h"
 
 typedef enum {
     TGAudioMessageButtonPlay = 0,
@@ -117,23 +117,21 @@ static CTFontRef textFontForSize(CGFloat size)
             }
         }
         
-        static TGTelegraphConversationMessageAssetsSource *assetsSource = nil;
-        static dispatch_once_t onceToken2;
-        dispatch_once(&onceToken2, ^
-        {
-            assetsSource = [TGTelegraphConversationMessageAssetsSource instance];
-        });
-
+        _authorPeerId = message.fromUid;
         
         _iconModel = [[TGDocumentMessageIconModel alloc] init];
+        _iconModel.presentation = context.presentation;
         _iconModel.skipDrawInContext = true;
         _iconModel.frame = CGRectMake(0.0f, 0.0f, 37.0f, 37.0f);
         _iconModel.incoming = _incomingAppearance;
         _iconModel.diameter = 37.0f;
         [self addSubmodel:_iconModel];
         
-        _textModel = [[TGModernTextViewModel alloc] initWithText:_documentMedia.caption font:textFontForSize(TGGetMessageViewModelLayoutConstants()->textFontSize)];
-        _textModel.textColor = [assetsSource messageTextColor];
+        _textModel = [[TGModernTextViewModel alloc] initWithText:message.caption font:textFontForSize(TGGetMessageViewModelLayoutConstants()->textFontSize)];
+        _textModel.underlineAllLinks = _incomingAppearance ? _context.presentation.pallete.underlineAllIncomingLinks : _context.presentation.pallete.underlineAllOutgoingLinks;
+        _textModel.textCheckingResults = message.textCheckingResults;
+        _textModel.textColor = _incomingAppearance ? _context.presentation.pallete.chatIncomingTextColor : _context.presentation.pallete.chatOutgoingTextColor;
+        _textModel.linkColor = _incomingAppearance ? _context.presentation.pallete.chatIncomingLinkColor : _context.presentation.pallete.chatOutgoingLinkColor;
         if (message.isBroadcast)
             _textModel.additionalTrailingWidth += 10.0f;
         [_contentModel addSubmodel:_textModel];
@@ -143,6 +141,7 @@ static CTFontRef textFontForSize(CGFloat size)
         _fileType = fileType;
         
         _sliderModel = [[TGAudioSliderViewModel alloc] init];
+        _sliderModel.presentation = context.presentation;
         if (_audioMedia != nil) {
             _sliderModel.audioId = _audioMedia.audioId;
             _sliderModel.localAudioId = _audioMedia.localAudioId;
@@ -225,8 +224,9 @@ static CTFontRef textFontForSize(CGFloat size)
         }
     }
     
-    if (!TGStringCompare(_textModel.text, _documentMedia.caption)) {
-        _textModel.text = _documentMedia.caption;
+    if (!TGStringCompare(_textModel.text, message.caption)) {
+        _textModel.text = message.caption;
+        _textModel.textCheckingResults = message.textCheckingResults;
         if (sizeUpdated != NULL)
             *sizeUpdated = true;
     }
@@ -357,12 +357,12 @@ static CTFontRef textFontForSize(CGFloat size)
         }
     }
     else
-        [_context.companionHandle requestAction:@"mediaDownloadRequested" options:@{@"mid": @(_mid)}];
+        [_context.companionHandle requestAction:@"mediaDownloadRequested" options:@{@"mid": @(_mid), @"peerId": @(_authorPeerId)}];
 }
 
 - (void)cancelMediaDownload
 {
-    [_context.companionHandle requestAction:@"mediaProgressCancelRequested" options:@{@"mid": @(_mid)}];
+    [_context.companionHandle requestAction:@"mediaProgressCancelRequested" options:@{@"mid": @(_mid), @"peerId": @(_authorPeerId)}];
 }
 
 - (void)messageImageViewActionButtonPressed:(TGMessageImageView *)messageImageView withAction:(TGMessageImageViewActionType)action
@@ -411,6 +411,22 @@ static CTFontRef textFontForSize(CGFloat size)
         *needsContentsUpdate = updateContents;
     
     CGFloat width = MAX(160, MIN(205, _duration * 30));
+    
+    CGFloat minVoiceLength = 2.0f;
+    CGFloat maxVoiceLength = 50.0f;
+    CGFloat maxVoiceWidth = 205.0f;
+    CGFloat minVoiceWidth = 124.0f;
+    
+    CGFloat calcDuration = MAX(minVoiceLength, MIN(maxVoiceLength, _duration));
+    
+    //CGFloat b = ((CGFloat)log(maxVoiceWidth / minVoiceWidth)) / (maxVoiceLength);
+    //CGFloat a = minVoiceWidth / expf(0.0f);
+    
+    //width = a * exp(b * MIN(maxVoiceLength, (CGFloat)_duration));
+    
+    width = minVoiceWidth + (maxVoiceWidth - minVoiceWidth) * (calcDuration - minVoiceLength) / (maxVoiceLength - minVoiceLength);
+    width = CGFloor(width);
+    
     CGFloat height = 50.0f;
     
     if (_textModel.text.length != 0 && ![_textModel.text isEqualToString:@" "]) {
@@ -420,7 +436,7 @@ static CTFontRef textFontForSize(CGFloat size)
             height -= 10.0f;
         }
     } else {
-        height += (infoWidth > (width - 80.0f) ? 12.0f : 0.0f);
+        height += (infoWidth > (width - 60.0f) ? 12.0f : 0.0f);
         if (infoWidth < FLT_EPSILON) {
             height -= 2.0f;
         }
@@ -491,9 +507,9 @@ static CTFontRef textFontForSize(CGFloat size)
             CGPoint point = [recognizer locationInView:[_contentModel boundView]];
             
             if (recognizer.longTapped)
-                [_context.companionHandle requestAction:@"messageSelectionRequested" options:@{@"mid": @(_mid)}];
+                [_context.companionHandle requestAction:@"messageSelectionRequested" options:@{@"mid": @(_mid), @"peerId": @(_authorPeerId)}];
             else if (recognizer.doubleTapped)
-                [_context.companionHandle requestAction:@"messageSelectionRequested" options:@{@"mid": @(_mid)}];
+                [_context.companionHandle requestAction:@"messageSelectionRequested" options:@{@"mid": @(_mid), @"peerId": @(_authorPeerId)}];
             else if (_forwardedHeaderModel && CGRectContainsPoint(_forwardedHeaderModel.frame, point)) {
                 if (_viaUser != nil && [_forwardedHeaderModel linkAtPoint:CGPointMake(point.x - _forwardedHeaderModel.frame.origin.x, point.y - _forwardedHeaderModel.frame.origin.y) regionData:NULL]) {
                     [_context.companionHandle requestAction:@"useContextBot" options:@{@"uid": @((int32_t)_viaUser.uid), @"username": _viaUser.userName == nil ? @"" : _viaUser.userName}];

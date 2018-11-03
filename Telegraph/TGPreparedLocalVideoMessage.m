@@ -1,23 +1,14 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGPreparedLocalVideoMessage.h"
 
-#import "TGMessage.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGImageUtils.h"
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 
 #import "TGAppDelegate.h"
 
 @implementation TGPreparedLocalVideoMessage
 
-+ (instancetype)messageWithTempVideoPath:(NSString *)tempVideoPath videoSize:(CGSize)videoSize size:(int32_t)size duration:(NSTimeInterval)duration previewImage:(UIImage *)previewImage thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl caption:(NSString *)caption replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup
++ (instancetype)messageWithTempVideoPath:(NSString *)tempVideoPath videoSize:(CGSize)videoSize size:(int32_t)size duration:(NSTimeInterval)duration previewImage:(UIImage *)previewImage thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl text:(NSString *)text entities:(NSArray *)entities replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup
 {
 #ifdef DEBUG
     NSAssert(tempVideoPath != nil, @"tempVideoPath should not be nil");
@@ -54,7 +45,8 @@
     
     message.assetUrl = assetUrl;
     
-    message.caption = caption;
+    message.text = text;
+    message.entities = entities;
     
     message.replyMessage = replyMessage;
     message.replyMarkup = replyMarkup;
@@ -62,7 +54,7 @@
     return message;
 }
 
-+ (instancetype)messageWithLocalVideoId:(int64_t)localVideoId videoSize:(CGSize)videoSize size:(int32_t)size duration:(NSTimeInterval)duration localThumbnailDataPath:(NSString *)localThumbnailDataPath thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl caption:(NSString *)caption replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup
++ (instancetype)messageWithLocalVideoId:(int64_t)localVideoId videoSize:(CGSize)videoSize size:(int32_t)size duration:(NSTimeInterval)duration localThumbnailDataPath:(NSString *)localThumbnailDataPath thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl text:(NSString *)text entities:(NSArray *)entities replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup
 {
 #ifdef DEBUG
     NSAssert(localThumbnailDataPath != nil, @"localThumbnailDataPath should not be nil");
@@ -77,7 +69,8 @@
     message.localThumbnailDataPath = localThumbnailDataPath;
     message.thumbnailSize = thumbnailSize;
     message.assetUrl = assetUrl;
-    message.caption = caption;
+    message.text = text;
+    message.entities = entities;
     message.replyMessage = replyMessage;
     message.replyMarkup = replyMarkup;
     
@@ -103,7 +96,10 @@
     {
         if ([mediaAttachment isKindOfClass:[TGVideoMediaAttachment class]])
         {
-            return [self messageByCopyingDataFromMedia:mediaAttachment replyMessage:replyMessage replyMarkup:replyMarkup];
+            TGPreparedLocalVideoMessage *message = [self messageByCopyingDataFromMedia:mediaAttachment replyMessage:replyMessage replyMarkup:replyMarkup];
+            message.text = source.text;
+            message.entities = source.entities;
+            return message;
         }
     }
     
@@ -155,8 +151,6 @@
     }
     
     message.thumbnailSize = thumbnailSize;
-    
-    message.caption = videoAttachment.caption;
     
     message.replyMessage = replyMessage;
     message.replyMarkup = replyMarkup;
@@ -214,6 +208,7 @@
     message.date = self.date;
     message.isBroadcast = self.isBroadcast;
     message.messageLifetime = self.messageLifetime;
+    message.text = self.text;
     
     NSMutableArray *attachments = [[NSMutableArray alloc] init];
     
@@ -229,7 +224,6 @@
     TGVideoInfo *videoInfo = [[TGVideoInfo alloc] init];
     [videoInfo addVideoWithQuality:1 url:[[NSString alloc] initWithFormat:@"local-video:local%llx.mov", _localVideoId] size:_size];
     videoAttachment.videoInfo = videoInfo;
-    videoAttachment.caption = self.caption;
     [attachments addObject:videoAttachment];
     
     TGLocalMessageMetaMediaAttachment *mediaMeta = [[TGLocalMessageMetaMediaAttachment alloc] init];
@@ -249,6 +243,7 @@
     }
     
     message.mediaAttachments = attachments;
+    message.entities = self.entities;
     
     return message;
 }

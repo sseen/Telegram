@@ -1,11 +1,10 @@
 #import "TGCallAvatarView.h"
 
-#import "TGImageUtils.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGUser.h"
 #import "TGCallSession.h"
 
-#import "TGLetteredAvatarView.h"
+#import <LegacyComponents/TGLetteredAvatarView.h>
 
 const NSInteger TGCallSpeechRippleMaxCount = 2;
 const NSTimeInterval TGCallSpeechRippleInterval = 0.25;
@@ -168,7 +167,7 @@ const CGFloat TGCallAvatarNormalScale = 0.75f;
         
         if (state.peer.photoUrlSmall.length > 0)
         {
-            [_avatarView loadImage:state.peer.photoUrlBig filter:@"circle:128x128" placeholder:placeholder];
+            [_avatarView loadImage:state.peer.photoFullUrlBig filter:@"circle:128x128" placeholder:placeholder];
         }
         else
         {

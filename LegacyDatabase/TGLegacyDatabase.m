@@ -1,14 +1,39 @@
 #import "TGLegacyDatabase.h"
 
 #import "FMDatabase.h"
-#import "TGPeerIdAdapter.h"
+
 #import "PSKeyValueDecoder.h"
 
 #import "TGLegacyUser.h"
 
+#import "TGUserModel.h"
 #import "TGPrivateChatModel.h"
 #import "TGGroupChatModel.h"
 #import "TGChannelChatModel.h"
+
+static inline bool TGPeerIdIsChannel(int64_t peerId) {
+    return peerId <= ((int64_t)INT32_MIN) * 2 && peerId > ((int64_t)INT32_MIN) * 3;
+}
+
+static inline int64_t TGPeerIdFromChannelId(int32_t channelId) {
+    return ((int64_t)INT32_MIN) * 2 - ((int64_t)channelId);
+}
+
+static inline int32_t TGChannelIdFromPeerId(int64_t peerId) {
+    if (TGPeerIdIsChannel(peerId)) {
+        return (int32_t)(((int64_t)INT32_MIN) * 2 - peerId);
+    } else {
+        return 0;
+    }
+}
+
+static inline bool TGPeerIdIsGroup(int64_t peerId) {
+    return peerId < 0 && peerId > INT32_MIN;
+}
+
+static inline bool TGPeerIdIsUser(int64_t peerId) {
+    return peerId > 0 && peerId < INT32_MAX;
+}
 
 #import <SSignalKit/SSignalKit.h>
 
@@ -262,11 +287,8 @@ int32_t murMurHash32(NSString *string)
         }
     }
     
-    if (bufPtr > 8) {
-        return [[NSString alloc] initWithBytes:buf + bufPtr - 8 length:8 encoding:NSUTF8StringEncoding];
-    } else {
-        return [[NSString alloc] initWithBytes:buf length:bufPtr encoding:NSUTF8StringEncoding];
-    }
+    return [[NSString alloc] initWithBytes:buf length:bufPtr encoding:NSUTF8StringEncoding];
+    
 }
 
 - (SSignal *)contactUsersMatchingPhone:(NSString *)queryPhoneNumber {
@@ -320,7 +342,7 @@ int32_t murMurHash32(NSString *string)
 - (NSArray<TGLegacyUser *> *)topUsers {
     NSMutableArray<TGLegacyUser *> *users = [[NSMutableArray alloc] init];
     
-    FMResultSet *result = [_database executeQuery:[NSString stringWithFormat:@"SELECT u.uid, u.first_name, u.last_name, u.access_hash, u.photo_small FROM users_v29 u JOIN peer_rating_29 p ON u.uid = p.peer_id WHERE p.category = 1 ORDER BY p.rating DESC LIMIT 8"]];
+    FMResultSet *result = [_database executeQuery:[NSString stringWithFormat:@"SELECT u.uid, u.first_name, u.last_name, u.access_hash, u.photo_small FROM users_v29 u JOIN peer_rating_29 p ON u.uid = p.peer_id WHERE p.category = 1 ORDER BY p.rating DESC LIMIT 9"]];
     while ([result next]) {
         int32_t uid = [result intForColumnIndex:0];
         NSString *firstName = [result stringForColumnIndex:1];
@@ -359,6 +381,31 @@ int32_t murMurHash32(NSString *string)
     }
     
     return counts;
+}
+
+- (TGLegacyUser *)userWithIdSync:(int32_t)userId {
+    
+    __block TGLegacyUser *resultUser = nil;
+    [_queue dispatchSync:^{
+        NSString *tableName = @"users_v29";
+        
+        TGLegacyUser *model = nil;
+        FMResultSet *result = [_database executeQuery:[NSString stringWithFormat:@"SELECT uid, first_name, last_name, access_hash, photo_small, phone_number FROM %@ WHERE uid=?", tableName], @(userId)];
+        if ([result next])
+        {
+            int32_t uid = [result intForColumnIndex:0];
+            NSString *firstName = [result stringForColumnIndex:1];
+            NSString *lastName = [result stringForColumnIndex:2];
+            int64_t accessHash = [result intForColumnIndex:3];
+            NSString *photoSmall = [result stringForColumnIndex:4];
+            NSString *phoneNumber = [result stringForColumnIndex:5];
+            
+            model = [[TGLegacyUser alloc] initWithUserId:uid accessHash:accessHash firstName:firstName lastName:lastName phoneNumber:phoneNumber photoSmall:photoSmall];
+        }
+        
+        resultUser = model;
+    }];
+    return resultUser;
 }
 
 - (TGChatModel *)conversationWithIdSync:(int64_t)conversationId {

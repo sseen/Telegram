@@ -3,7 +3,7 @@
 #import "DrawingContext.h"
 #import "TGSharedMediaUtils.h"
 
-#import "TGModernGalleryTransitionView.h"
+#import <LegacyComponents/TGModernGalleryTransitionView.h>
 
 @implementation TransformImageArguments
 
@@ -18,6 +18,16 @@
         _boundingSize = boundingSize;
         _cornerRadius = cornerRadius;
         _scaleToFit = scaleToFit;
+    }
+    return self;
+}
+
+- (instancetype)initAutoSizeWithBoundingSize:(CGSize)boundingSize cornerRadius:(CGFloat)cornerRadius {
+    self = [super init];
+    if (self != nil) {
+        _boundingSize = boundingSize;
+        _cornerRadius = cornerRadius;
+        _autoSize = true;
     }
     return self;
 }
@@ -55,10 +65,19 @@
 }
 
 - (void)setSignal:(SSignal *)signal {
+    if (signal == nil)
+    {
+        [_disposable setDisposable:nil];
+        return;
+    }
+    
     SVariable *arguments = _arguments;
     
     SSignal *result = [[[SSignal combineSignals:@[signal, [arguments signal]]] deliverOnThreadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool]] mapToThrottled:^SSignal *(NSArray *values) {
         return [SSignal defer:^SSignal *{
+            if ([values[0] isKindOfClass:[UIImage class]])
+                return [SSignal single:values[0]];
+            
             DrawingContext *(^transform)(TransformImageArguments *) = values[0];
             return [SSignal single:transform(values[1]).generateImage];
         }];
@@ -68,6 +87,7 @@
     [_disposable setDisposable:[[result deliverOn:[SQueue mainQueue]] startWithNext:^(UIImage *next) {
         __strong TransformImageView *strongSelf = weakSelf;
         if (strongSelf != nil) {
+            strongSelf->_imageSize = next.size;
             /*if strongSelf.alphaTransitionOnFirstUpdate && strongSelf.contents == nil {
                 strongSelf.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.15)
             }*/
@@ -79,6 +99,11 @@
             }
         }
     }]];
+}
+
+- (void)reset
+{
+    self.layer.contents = nil;
 }
 
 - (UIImage *)transitionImage {

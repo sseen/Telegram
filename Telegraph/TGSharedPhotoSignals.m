@@ -1,20 +1,18 @@
 #import "TGSharedPhotoSignals.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
+#import "TGDatabase.h"
 #import "TGSharedMediaSignals.h"
 
-#import "TGImageMediaAttachment.h"
-#import "TGImageUtils.h"
-
 #import "TGImageInfo+Telegraph.h"
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 
 #import "TGRemoteHttpLocationSignal.h"
 
 #import "TGAppDelegate.h"
 
 #import "TGImageInfo+Telegraph.h"
-
-#import "TGDocumentMediaAttachment.h"
 
 #import "TGSharedMediaUtils.h"
 
@@ -167,14 +165,14 @@
     }];
 }
 
-+ (SSignal *)remoteImageData:(NSString *)directory size:(CGSize)size quality:(TGSharedMediaImageDataQuality)quality url:(NSString *)url reportProgress:(bool)reportProgress
++ (SSignal *)remoteImageData:(NSString *)directory size:(CGSize)size quality:(TGSharedMediaImageDataQuality)quality url:(NSString *)url reportProgress:(bool)reportProgress originInfo:(TGMediaOriginInfo *)originInfo
 {
     NSInteger datacenterId = 0;
-    TLInputFileLocation *location = [TGSharedMediaSignals inputFileLocationForImageUrl:url datacenterId:&datacenterId];
+    TLInputFileLocation *location = [TGSharedMediaSignals inputFileLocationForImageUrl:url datacenterId:&datacenterId originInfo:originInfo];
     
     if (location != nil)
     {
-        SSignal *signal = [[TGSharedMediaSignals memoizedDataSignalForRemoteLocation:location datacenterId:datacenterId reportProgress:reportProgress mediaTypeTag:TGNetworkMediaTypeTagImage] map:^id (id next)
+        SSignal *signal = [[TGSharedMediaSignals memoizedDataSignalForRemoteLocation:location datacenterId:datacenterId originInfo:originInfo identifier:0 reportProgress:reportProgress mediaTypeTag:TGNetworkMediaTypeTagImage] map:^id (id next)
         {
             if ([next isKindOfClass:[NSData class]])
             {
@@ -236,8 +234,8 @@
         
         bool useProgress = true;
         
-        SSignal *remoteThumbnailDataSignal = [(useProgress ? [SSignal single:@(0.0f)] : [SSignal complete]) then:[self remoteImageData:directory size:thumbnailSize quality:TGSharedMediaImageDataQualityLow url:thumbnailSizeUrl reportProgress:false]];
-        SSignal *remoteRequiredDataSignal = [self remoteImageData:directory size:requiredSize quality:TGSharedMediaImageDataQualityNormal url:requiredSizeUrl reportProgress:useProgress];
+        SSignal *remoteThumbnailDataSignal = [(useProgress ? [SSignal single:@(0.0f)] : [SSignal complete]) then:[self remoteImageData:directory size:thumbnailSize quality:TGSharedMediaImageDataQualityLow url:thumbnailSizeUrl reportProgress:false originInfo:imageAttachment.originInfo]];
+        SSignal *remoteRequiredDataSignal = [self remoteImageData:directory size:requiredSize quality:TGSharedMediaImageDataQualityNormal url:requiredSizeUrl reportProgress:useProgress originInfo:imageAttachment.originInfo];
         
         signal = [[signal catch:^SSignal *(__unused id error)
         {
@@ -278,7 +276,12 @@
     } threadPool:threadPool memoryCache:memoryCache];
 }
 
-+ (SSignal *)squarePhotoThumbnail:(TGImageMediaAttachment *)imageAttachment ofSize:(CGSize)size threadPool:(SThreadPool *)threadPool memoryCache:(TGMemoryImageCache *)memoryCache pixelProcessingBlock:(void (^)(void *, int, int, int))pixelProcessingBlock downloadLargeImage:(bool)downloadLargeImage placeholder:(SSignal *)__unused placeholder
++ (SSignal *)squarePhotoThumbnail:(TGImageMediaAttachment *)imageAttachment ofSize:(CGSize)size threadPool:(SThreadPool *)threadPool memoryCache:(TGMemoryImageCache *)memoryCache pixelProcessingBlock:(void (^)(void *, int, int, int))pixelProcessingBlock downloadLargeImage:(bool)downloadLargeImage placeholder:(SSignal *)placeholder
+{
+    return [self squarePhotoThumbnail:imageAttachment ofSize:size threadPool:threadPool memoryCache:memoryCache pixelProcessingBlock:pixelProcessingBlock downloadLargeImage:downloadLargeImage inhibitBlur:false placeholder:placeholder];
+}
+
++ (SSignal *)squarePhotoThumbnail:(TGImageMediaAttachment *)imageAttachment ofSize:(CGSize)size threadPool:(SThreadPool *)threadPool memoryCache:(TGMemoryImageCache *)memoryCache pixelProcessingBlock:(void (^)(void *, int, int, int))pixelProcessingBlock downloadLargeImage:(bool)downloadLargeImage inhibitBlur:(bool)inhibitBlur placeholder:(SSignal *)__unused placeholder
 {
     CGSize imageSize = CGSizeZero;
     [imageAttachment.imageInfo imageUrlForLargestSize:&imageSize];
@@ -324,10 +327,10 @@
     } localCachedImageSignalGenerator:^SSignal *(CGSize size, CGSize renderSize, bool lowQuality)
     {
         return [self localCachedImageForPhotoThumbnail:imageAttachment ofSize:size renderSize:renderSize lowQuality:lowQuality];
-    } lowQualityImagePath:genericThumbnailPath lowQualityImageUrl:[imageAttachment.imageInfo closestImageUrlWithSize:CGSizeZero resultingSize:NULL] highQualityImageUrl:highQualityUrl highQualityImageIdentifier:highQualityIdentifier threadPool:threadPool memoryCache:memoryCache placeholder:nil blurLowQuality:size.width > 40 || size.height > 40];
+    } lowQualityImagePath:genericThumbnailPath lowQualityImageUrl:[imageAttachment.imageInfo closestImageUrlWithSize:CGSizeZero resultingSize:NULL] highQualityImageUrl:highQualityUrl highQualityImageIdentifier:highQualityIdentifier threadPool:threadPool memoryCache:memoryCache placeholder:nil blurLowQuality:!inhibitBlur && (size.width > 40 || size.height > 40) originInfo:imageAttachment.originInfo];
 }
 
-+ (SSignal *)cachedRemoteThumbnail:(TGImageInfo *)imageInfo size:(CGSize)size pixelProcessingBlock:(void (^)(void *, int, int, int))pixelProcessingBlock cacheVariantKey:(NSString *)cacheVariantKey threadPool:(SThreadPool *)threadPool memoryCache:(TGMemoryImageCache *)memoryCache diskCache:(TGModernCache *)diskCache {
++ (SSignal *)cachedRemoteThumbnail:(TGImageInfo *)imageInfo size:(CGSize)size pixelProcessingBlock:(void (^)(void *, int, int, int))pixelProcessingBlock cacheVariantKey:(NSString *)cacheVariantKey threadPool:(SThreadPool *)threadPool memoryCache:(TGMemoryImageCache *)memoryCache diskCache:(TGModernCache *)diskCache originInfo:(TGMediaOriginInfo *)originInfo identifier:(int64_t)identifier {
     NSString *imageUrl = [imageInfo imageUrlForSizeLargerThanSize:CGSizeMake(size.width * 2.0f, size.height * 2.0f) actualSize:NULL];
     if (imageUrl == nil) {
         return nil;
@@ -345,8 +348,9 @@
             location.volume_id = volumeId;
             location.local_id = localId;
             location.secret = secret;
+            location.file_reference = [originInfo fileReferenceForVolumeId:volumeId localId:localId];
             
-            return [TGSharedMediaSignals memoizedDataSignalForRemoteLocation:location datacenterId:datacenterId reportProgress:false mediaTypeTag:TGNetworkMediaTypeTagImage];
+            return [TGSharedMediaSignals memoizedDataSignalForRemoteLocation:location datacenterId:datacenterId originInfo:originInfo identifier:identifier reportProgress:false mediaTypeTag:TGNetworkMediaTypeTagImage];
         } else {
             return [SSignal fail:nil];
         }
@@ -371,8 +375,9 @@
             location.volume_id = volumeId;
             location.local_id = localId;
             location.secret = secret;
+            location.file_reference = [document.originInfo fileReferenceForVolumeId:volumeId localId:localId];
             
-            return [TGSharedMediaSignals memoizedDataSignalForRemoteLocation:location datacenterId:datacenterId reportProgress:false mediaTypeTag:TGNetworkMediaTypeTagImage];
+            return [TGSharedMediaSignals memoizedDataSignalForRemoteLocation:location datacenterId:datacenterId originInfo:document.originInfo identifier:0 reportProgress:false mediaTypeTag:TGNetworkMediaTypeTagImage];
         } else {
             return [SSignal fail:nil];
         }
@@ -436,7 +441,37 @@
     
     return [TGSharedMediaSignals cachedRemoteThumbnailWithKey:key size:size pixelProcessingBlock:pixelProcessingBlock fetchData:[SSignal defer:^SSignal *{
         if (url.length != 0) {
-            return [TGRemoteHttpLocationSignal dataForHttpLocation:url];
+            if ([url hasPrefix:@"webdoc"]) {
+                NSInteger datacenterId = 0;
+                
+                int32_t webFileDatacenterId = 0;
+                NSData *data = [TGDatabaseInstance() customProperty:@"webFileDatacenterId"];
+                if (data.length == 4)
+                    [data getBytes:&webFileDatacenterId length:4];
+                
+                TLInputWebFileLocation *webLocation = [TGSharedMediaSignals inputWebFileLocationForImageUrl:url datacenterId:&datacenterId];
+                if (datacenterId == -1)
+                    datacenterId = webFileDatacenterId;
+                
+                if (webLocation != nil) {
+                    return [[TGSharedMediaSignals memoizedDataSignalForRemoteWebLocation:webLocation datacenterId:datacenterId reportProgress:false mediaTypeTag:TGNetworkMediaTypeTagImage] mapToSignal:^SSignal *(NSData *data)
+                   {
+                       [[TGSharedMediaUtils sharedMediaTemporaryPersistentCache] setValue:data forKey:[url dataUsingEncoding:NSUTF8StringEncoding]];
+                       //[data writeToFile:lowQualityImagePath atomically:true];
+
+                       if (data.length == 0)
+                           return [SSignal complete];
+                       else
+                           return [SSignal single:data];
+                   }];
+                }
+                else
+                {
+                    return [SSignal fail:nil];
+                }
+            } else {
+                return [TGRemoteHttpLocationSignal dataForHttpLocation:url];
+            }
         } else {
             return [SSignal fail:nil];
         }

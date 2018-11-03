@@ -1,25 +1,24 @@
 #import "TGPreviewGifItemView.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGStringUtils.h"
-#import "TGImageUtils.h"
-#import "TGPhotoEditorUtils.h"
+#import <LegacyComponents/ActionStage.h>
+
+#import <LegacyComponents/TGPhotoEditorUtils.h>
 
 #import "TGSharedPhotoSignals.h"
 #import "TGSharedMediaUtils.h"
 #import "TGMediaStoreContext.h"
 
-#import "TGImageView.h"
+#import <LegacyComponents/TGImageView.h>
 #import "TGVTAcceleratedVideoView.h"
-#import "TGMessageImageViewOverlayView.h"
+#import <LegacyComponents/TGMessageImageViewOverlayView.h>
 
-#import "TGDocumentMediaAttachment.h"
 #import "TGPreparedLocalDocumentMessage.h"
 #import "TGBotContextExternalResult.h"
 
 #import "TGTelegraph.h"
-#import "TGGifConverter.h"
+#import <LegacyComponents/TGGifConverter.h>
 
 #import "TGTelegramNetworking.h"
 
@@ -263,10 +262,10 @@
                                             return nil;
                                         }];
                                         return [dataSignal mapToSignal:^SSignal *(NSData *data) {
-                                            return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSString *tempPath) {
+                                            return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSDictionary *dict) {
                                                 return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subsctiber) {
                                                     NSError *error = nil;
-                                                    [[NSFileManager defaultManager] moveItemAtPath:tempPath toPath:videoPath error:&error];
+                                                    [[NSFileManager defaultManager] moveItemAtPath:dict[@"path"] toPath:videoPath error:&error];
                                                     if (error != nil) {
                                                         [subsctiber putError:nil];
                                                     } else {
@@ -313,7 +312,7 @@
                         }
                         if ([externalResult.resultId isEqualToString:currentExternalResult.resultId]) {
                             if (path != nil) {
-                                if ([externalResult.contentType isEqualToString:@"video/mp4"]) {
+                                if ([externalResult.content.mimeType isEqualToString:@"video/mp4"]) {
                                     [strongSelf->_videoView removeFromSuperview];
                                     strongSelf->_videoView = [[[TGVTAcceleratedVideoView videoViewClass] alloc] initWithFrame:strongSelf.bounds];
                                     [strongSelf insertSubview:strongSelf->_videoView aboveSubview:strongSelf->_overlayView];

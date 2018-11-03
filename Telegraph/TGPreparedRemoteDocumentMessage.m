@@ -1,16 +1,6 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGPreparedRemoteDocumentMessage.h"
 
-#import "TGDocumentMediaAttachment.h"
-#import "TGImageInfo.h"
-#import "TGMessage.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGMediaStoreContext.h"
 
@@ -34,7 +24,7 @@
         _size = documentMedia.size;
         _thumbnailInfo = documentMedia.thumbnailInfo;
         _attributes = documentMedia.attributes;
-        _caption = documentMedia.caption;
+        _originInfo = documentMedia.originInfo;
         
         self.replyMessage = replyMessage;
         self.botContextResult = botContextResult;
@@ -77,6 +67,7 @@
     message.date = self.date;
     message.isBroadcast = self.isBroadcast;
     message.messageLifetime = self.messageLifetime;
+    message.text = self.text;
     
     NSMutableArray *attachments = [[NSMutableArray alloc] init];
     
@@ -90,7 +81,7 @@
     documentAttachment.mimeType = _mimeType;
     documentAttachment.size = _size;
     documentAttachment.thumbnailInfo = _thumbnailInfo;
-    documentAttachment.caption = _caption;
+    documentAttachment.originInfo = _originInfo;
     [attachments addObject:documentAttachment];
     
     if (self.replyMessage != nil)
@@ -112,6 +103,7 @@
     }
     
     message.mediaAttachments = attachments;
+    message.entities = self.entities;
     
     return message;
 }
@@ -127,7 +119,7 @@
     documentAttachment.mimeType = _mimeType;
     documentAttachment.size = _size;
     documentAttachment.thumbnailInfo = _thumbnailInfo;
-    documentAttachment.caption = _caption;
+    documentAttachment.originInfo = _originInfo;
     return documentAttachment;
 }
 

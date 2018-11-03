@@ -1,5 +1,6 @@
-#import "TGOverlayController.h"
-#import "TGPIPAblePlayerView.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/TGPIPAblePlayerView.h>
 
 @class TGEmbedPIPPlaceholderView;
 @class TGWebPageMediaAttachment;
@@ -7,12 +8,12 @@
 @interface TGPIPSourceLocation : NSObject
 
 @property (nonatomic, readonly) bool embed;
-@property (nonatomic, readonly) int64_t peerId;
+@property (nonatomic, readonly) int64_t conversationId;
 @property (nonatomic, readonly) int32_t messageId;
 @property (nonatomic, readonly) int32_t localId;
 @property (nonatomic, readonly) TGWebPageMediaAttachment *webPage;
 
-- (instancetype)initWithEmbed:(bool)embed peerId:(int64_t)peerId messageId:(int32_t)messageId localId:(int32_t)localId webPage:(TGWebPageMediaAttachment *)webPage;
+- (instancetype)initWithEmbed:(bool)embed conversationId:(int64_t)conversationId messageId:(int32_t)messageId localId:(int32_t)localId webPage:(TGWebPageMediaAttachment *)webPage;
 
 @end
 

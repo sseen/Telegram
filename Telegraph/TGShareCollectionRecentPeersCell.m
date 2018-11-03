@@ -1,4 +1,7 @@
 #import "TGShareCollectionRecentPeersCell.h"
+
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGModernMediaCollectionView.h"
 
 #import "TGShareCollectionCell.h"
@@ -7,10 +10,9 @@
 
 #import "TGDialogListRecentPeers.h"
 
-#import "TGUser.h"
-#import "TGConversation.h"
-#import "TGModernButton.h"
-#import "TGFont.h"
+#import <LegacyComponents/TGModernButton.h>
+
+#import "TGPresentation.h"
 
 NSString *const TGShareCollectionRecentPeersCellIdentifier = @"TGShareCollectionRecentPeersCell";
 
@@ -64,6 +66,8 @@ NSString *const TGShareCollectionRecentPeersCellIdentifier = @"TGShareCollection
         _collectionLayout = [[UICollectionViewFlowLayout alloc] init];
         _collectionLayout.scrollDirection = UICollectionViewScrollDirectionHorizontal;
         _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:_collectionLayout];
+        if (iosMajorVersion() >= 11)
+            _collectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
         _collectionView.delegate = self;
         _collectionView.dataSource = self;
         _collectionView.opaque = false;
@@ -77,6 +81,18 @@ NSString *const TGShareCollectionRecentPeersCellIdentifier = @"TGShareCollection
 }
 
 - (void)dealloc {
+}
+
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    _presentation = presentation;
+    
+    _headerBackground.backgroundColor = presentation.pallete.menuSectionHeaderBackgroundColor;
+    _headerLabel.backgroundColor = presentation.pallete.menuSectionHeaderBackgroundColor;
+    _bottomHeaderLabel.backgroundColor = presentation.pallete.menuSectionHeaderBackgroundColor;
+    _bottomHeaderBackground.backgroundColor = presentation.pallete.menuSectionHeaderBackgroundColor;
+    _headerLabel.textColor = presentation.pallete.sectionHeaderTextColor;
+    _bottomHeaderLabel.textColor = presentation.pallete.sectionHeaderTextColor;
 }
 
 - (void)setRecentPeers:(TGDialogListRecentPeers *)recentPeers {
@@ -156,7 +172,7 @@ NSString *const TGShareCollectionRecentPeersCellIdentifier = @"TGShareCollection
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath
 {
     TGShareCollectionCell *cell = (TGShareCollectionCell *)[collectionView dequeueReusableCellWithReuseIdentifier:TGShareCollectionCellIdentifier forIndexPath:indexPath];
-    
+    cell.presentation = self.presentation;
     [cell setShowOnlyFirstName:true];
     
     id peer = _recentPeers[indexPath.item];

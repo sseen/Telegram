@@ -8,7 +8,8 @@
 
 #import "TGModernConversationInputPanel.h"
 
-#import "TGModernButton.h"
+#import <SSignalKit/SSignalKit.h>
+#import <LegacyComponents/TGModernButton.h>
 
 @class HPGrowingTextView;
 @class TGModernConversationInputTextPanel;
@@ -19,17 +20,21 @@
 @class TGViewController;
 @class TGUser;
 @class TGModernConversationInputMicButton;
+@class TLInputMedia;
+@class TGPreparedMessage;
 
 @interface TGMessageEditingContext: NSObject <NSCoding>
 
 @property (nonatomic, strong, readonly) NSString *text;
 @property (nonatomic, strong, readonly) NSArray *entities;
-@property (nonatomic, readonly) int32_t messageId;
 @property (nonatomic, readonly) bool isCaption;
+@property (nonatomic, readonly) bool hasMedia;
+@property (nonatomic, readonly) int64_t cid;
+@property (nonatomic, readonly) int32_t messageId;
 
-+ (NSAttributedString *)attributedStringForText:(NSString *)text entities:(NSArray *)entities;
++ (NSAttributedString *)attributedStringForText:(NSString *)text entities:(NSArray *)entities fontSize:(CGFloat)fontSize;
 
-- (instancetype)initWithText:(NSString *)text entities:(NSArray *)entities isCaption:(bool)isCaption messageId:(int32_t)messageId;
+- (instancetype)initWithText:(NSString *)text entities:(NSArray *)entities isCaption:(bool)isCaption hasMedia:(bool)hasMedia cid:(int64_t)cid messageId:(int32_t)messageId;
 
 @end
 
@@ -38,7 +43,7 @@
 - (void)inputTextPanelHasIndicatedTypingActivity:(TGModernConversationInputTextPanel *)inputTextPanel;
 - (void)inputTextPanelHasCancelledTypingActivity:(TGModernConversationInputTextPanel *)inputTextPanel;
 - (void)inputPanelRequestedSendMessage:(TGModernConversationInputTextPanel *)inputTextPanel text:(NSString *)text;
-- (void)inputPanelRequestedSendMessage:(TGModernConversationInputTextPanel *)inputTextPanel text:(NSString *)text entities:(NSArray *)entities;
+- (void)inputPanelRequestedSendMessage:(TGModernConversationInputTextPanel *)inputTextPanel text:(NSString *)text entities:(NSArray *)entities media:(TLInputMedia *)media preparedMessage:(TGPreparedMessage *)preparedMessage;
 - (void)inputPanelRequestedAttachmentsMenu:(TGModernConversationInputTextPanel *)inputTextPanel;
 - (void)inputPanelRequestedSendImages:(TGModernConversationInputTextPanel *)inputTextPanel images:(NSArray *)images;
 - (void)inputPanelRequestedSendData:(TGModernConversationInputTextPanel *)inputTextPanel data:(NSData *)data;
@@ -51,6 +56,7 @@
 - (void)inputPanelMentionTextEntered:(TGModernConversationInputTextPanel *)inputTextPanel mention:(NSString *)mention text:(NSString *)text;
 - (void)inputPanelHashtagEntered:(TGModernConversationInputTextPanel *)inputTextPanel hashtag:(NSString *)hashtag;
 - (void)inputPanelCommandEntered:(TGModernConversationInputTextPanel *)inputTextPanel command:(NSString *)hashtag;
+- (void)inputPanelAlphacodeEntered:(TGModernConversationInputTextPanel *)inputTextPanel alphacode:(NSString *)alphacode;
 - (void)inputPanelLinkParsed:(TGModernConversationInputTextPanel *)inputTextPanel link:(NSString *)link probablyComplete:(bool)probablyComplete;
 - (bool)isInputPanelTextEnabled:(TGModernConversationInputTextPanel *)inputTextPanel;
 - (void)inputPanelFocused:(TGModernConversationInputTextPanel *)inputTextPanel;
@@ -127,6 +133,8 @@
 
 @property (nonatomic, strong) TGMessageEditingContext *messageEditingContext;
 
+@property (nonatomic, strong) SSignal *channelInfoSignal;
+
 @property (nonatomic, copy) bool (^canOpenStickersPanel)();
 @property (nonatomic, copy) bool (^canRecordMedia)();
 
@@ -183,11 +191,23 @@
 
 - (void)updateModeButtonVisibility:(bool)animated reset:(bool)reset;
 
-- (bool)hasInteractiveDismissal;
-
+- (CGFloat)customKeyboardHeight;
+- (bool)isCustomKeyboardActive;
 - (void)setCustomKeyboardExpanded:(bool)expanded animated:(bool)animated;
 
 - (void)willDisappear;
 - (bool)isActive;
+
+- (void)prepareForResultPreviewAppearance:(bool)keepAssociatedPanel;
+- (void)prepareForResultPreviewDismissal:(bool)restoreFocus;
+- (bool)willRestoreFocus;
+
+- (void)setChannelInfoSignal:(SSignal *)signal;
+
+- (NSInteger)textCaretPosition;
+
+- (UIView *)keyboardSnapshotView;
+
+- (CGFloat)fontSize;
 
 @end

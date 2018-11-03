@@ -1,9 +1,9 @@
 #import "TGPreviewPhotoItemView.h"
 
-#import "TGImageUtils.h"
-#import "TGPhotoEditorUtils.h"
-#import "TGImageMediaAttachment.h"
-#import "TGImageView.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/TGPhotoEditorUtils.h>
+#import <LegacyComponents/TGImageView.h>
 
 #import "TGSharedPhotoSignals.h"
 #import "TGSharedMediaUtils.h"
@@ -68,9 +68,9 @@
     {
         CGSize thumbSize = TGFitSize(TGFillSizeF(_dimensions, fitSize), fitSize);
         
-        SSignal *thumbnailSignal = [TGSharedPhotoSignals cachedRemoteThumbnail:_attachment.imageInfo size:thumbSize pixelProcessingBlock:nil cacheVariantKey:@"mediaContextPanel" threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] diskCache:[TGSharedMediaUtils sharedMediaTemporaryPersistentCache]];
+        SSignal *thumbnailSignal = [TGSharedPhotoSignals cachedRemoteThumbnail:_attachment.imageInfo size:thumbSize pixelProcessingBlock:nil cacheVariantKey:@"mediaContextPanel" threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] diskCache:[TGSharedMediaUtils sharedMediaTemporaryPersistentCache] originInfo:_attachment.originInfo identifier:_attachment.imageId];
         
-        SSignal *largeSignal = [TGSharedPhotoSignals cachedRemoteThumbnail:_attachment.imageInfo size:_imageSize pixelProcessingBlock:nil cacheVariantKey:@"mediaContextPanel" threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] diskCache:[TGSharedMediaUtils sharedMediaTemporaryPersistentCache]];
+        SSignal *largeSignal = [TGSharedPhotoSignals cachedRemoteThumbnail:_attachment.imageInfo size:_imageSize pixelProcessingBlock:nil cacheVariantKey:@"mediaContextPanel" threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] diskCache:[TGSharedMediaUtils sharedMediaTemporaryPersistentCache] originInfo:_attachment.originInfo identifier:_attachment.imageId];
         
         [_imageView setSignal:[thumbnailSignal then:largeSignal]];
     }

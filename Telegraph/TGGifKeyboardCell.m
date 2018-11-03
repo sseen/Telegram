@@ -1,17 +1,18 @@
 #import "TGGifKeyboardCell.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGDocumentMediaAttachment.h"
-#import "TGImageView.h"
+#import <LegacyComponents/ActionStage.h>
+
+#import <LegacyComponents/TGImageView.h>
 #import "TGVTAcceleratedVideoView.h"
 
 #import "TGPreparedLocalDocumentMessage.h"
 
-#import "TGGifConverter.h"
+#import <LegacyComponents/TGGifConverter.h>
 #import "TGTelegraph.h"
 
-#import "TGMessageImageViewOverlayView.h"
+#import <LegacyComponents/TGMessageImageViewOverlayView.h>
 
 @interface TGGifKeyboardCellContents () <ASWatcher> {
     TGImageView *_imageView;
@@ -44,6 +45,12 @@
         _overlayView.hidden = true;
         [_overlayView setRadius:24.0f];
         [self addSubview:_overlayView];
+        
+        if (iosMajorVersion() >= 11)
+        {
+            _imageView.accessibilityIgnoresInvertColors = true;
+            _overlayView.accessibilityIgnoresInvertColors = true;
+        }
         
         _converterDisposable = [[SMetaDisposable alloc] init];
     }
@@ -153,6 +160,10 @@
         NSMutableString *previewUri = [[NSMutableString alloc] initWithString:@"file-thumbnail://?"];
         if (_document.documentId != 0) {
             [previewUri appendFormat:@"id=%" PRId64 "", _document.documentId];
+            
+            TGMediaOriginInfo *originInfo = _document.originInfo ?: [TGMediaOriginInfo mediaOriginInfoForDocumentAttachment:_document];
+            if (originInfo != nil)
+                [previewUri appendFormat:@"&origin_info=%@", [originInfo stringRepresentation]];
         }
         
         [previewUri appendFormat:@"&file-name=%@", [_document.fileName stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
@@ -211,10 +222,10 @@
                                         return nil;
                                     }];
                                     return [dataSignal mapToSignal:^SSignal *(NSData *data) {
-                                        return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSString *tempPath) {
+                                        return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSDictionary *dict) {
                                             return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subsctiber) {
                                                 NSError *error = nil;
-                                                [[NSFileManager defaultManager] moveItemAtPath:tempPath toPath:videoPath error:&error];
+                                                [[NSFileManager defaultManager] moveItemAtPath:dict[@"path"] toPath:videoPath error:&error];
                                                 if (error != nil) {
                                                     [subsctiber putError:nil];
                                                 } else {

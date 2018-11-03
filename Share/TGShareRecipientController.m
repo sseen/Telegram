@@ -124,6 +124,7 @@ const CGFloat TGShareBottomInset = 0.0f;
     
     _searchBar = [[TGShareSearchBar alloc] initWithFrame:CGRectMake(0.0f, 0.0f, _tableView.frame.size.width, [TGShareSearchBar searchBarBaseHeight])];
     _searchBar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    _searchBar.safeAreaInset = [self safeAreaInset];
     [_searchBar setPlaceholder:NSLocalizedString(@"Share.Search", nil)];
     _searchBar.delegate = self;
     
@@ -144,7 +145,7 @@ const CGFloat TGShareBottomInset = 0.0f;
     
     _searchResultsTableView = [[UITableView alloc] initWithFrame:_searchDimView.frame style:UITableViewStylePlain];
     _searchResultsTableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _searchResultsTableView.contentInset = UIEdgeInsetsMake(0.0f, 0.0f, _bottomInset, 0.0f);
+    _searchResultsTableView.contentInset = UIEdgeInsetsMake(0.0f, 0.0f, [self safeAreaInset].bottom, 0.0f);
     _searchResultsTableView.scrollIndicatorInsets = _searchResultsTableView.contentInset;
     _searchResultsTableView.dataSource = self;
     _searchResultsTableView.delegate = self;
@@ -178,7 +179,7 @@ const CGFloat TGShareBottomInset = 0.0f;
 - (void)updateCaptionPanelWithFrame:(CGRect)frame edgeInsets:(UIEdgeInsets)edgeInsets
 {
     _captionPanel.frame = CGRectMake(edgeInsets.left, _captionPanel.frame.origin.y, frame.size.width, _captionPanel.frame.size.height);
-    [_captionPanel adjustForOrientation:UIInterfaceOrientationPortrait keyboardHeight:_keyboardHeight duration:0.0 animationCurve:0];
+    [_captionPanel adjustForOrientation:UIInterfaceOrientationPortrait keyboardHeight:_keyboardHeight safeAreaInset:[self safeAreaInset] duration:0.0 animationCurve:0];
 }
 
 - (void)viewWillLayoutSubviews
@@ -189,10 +190,36 @@ const CGFloat TGShareBottomInset = 0.0f;
     [_captionPanel setContentAreaHeight:_contentAreaHeight - _keyboardHeight];
     [self updateCaptionPanelWithFrame:self.view.bounds edgeInsets:UIEdgeInsetsZero];
     
+    UIEdgeInsets safeAreaInset = [self safeAreaInset];
+    _searchBar.safeAreaInset = safeAreaInset;
+    
+    if (_searching)
+    {
+        CGFloat statusBarHeight = [self safeAreaInset].top;
+        _searchResultsTableView.frame = CGRectMake(0.0f, statusBarHeight + 44.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 44.0f - statusBarHeight);
+        
+        _bottomInset = MAX(TGShareBottomInset + [self safeAreaInset].bottom, _keyboardHeight + 44.0f);
+        _searchResultsTableView.contentInset = UIEdgeInsetsMake(0, 0, _bottomInset, 0);
+        
+        [self updateSafeAreaInset];
+    }
+    
     if (!_appeared)
     {
         _appeared = true;
         [self updateSelection:false];
+    }
+}
+
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    
+    if (_showRecents && _topModels.count > 0)
+    {
+        TGShareTopPeersCell *cell = [_searchResultsTableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+        if ([cell isKindOfClass:[TGShareTopPeersCell class]])
+            cell.safeAreaInset = [self safeAreaInset];
     }
 }
 
@@ -226,7 +253,19 @@ const CGFloat TGShareBottomInset = 0.0f;
 - (void)setChatModels:(NSArray *)chatModels userModels:(NSArray *)userModels
 {
     _currentPeers = nil;
-    _chatModels = chatModels;
+    
+    NSMutableArray *chats = [[NSMutableArray alloc] init];
+    for (TGChatModel *chat in chatModels)
+    {
+        if (chat.peerId.namespaceId == TGPeerIdPrivate && chat.peerId.peerId == _shareContext.clientUserId)
+            continue;
+        
+        [chats addObject:chat];
+    }
+    TGChatModel *selfChat = [[TGPrivateChatModel alloc] initWithUserId:_shareContext.clientUserId];
+    [chats insertObject:selfChat atIndex:0];
+    
+    _chatModels = chats;
     
     NSMutableDictionary *users = [[NSMutableDictionary alloc] init];
     for (TGUserModel *user in userModels)
@@ -322,6 +361,7 @@ const CGFloat TGShareBottomInset = 0.0f;
         if (cell == nil)
             cell = [[TGShareTopPeersCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"TGShareTopPeersCell"];
         
+        cell.safeAreaInset = [self safeAreaInset];
         [cell setPeers:_topModels shareContext:_shareContext];
         
         __weak TGShareRecipientController *weakSelf = self;
@@ -533,7 +573,14 @@ const CGFloat TGShareBottomInset = 0.0f;
             filteredPeers = peers;
         }
         
-        _currentPeers = [_foundPeers arrayByAddingObjectsFromArray:filteredPeers];
+        NSMutableArray *currentPeers = [[NSMutableArray alloc] init];
+        [currentPeers addObjectsFromArray:_foundPeers];
+        [currentPeers addObjectsFromArray:filteredPeers];
+        
+        //TGConversation *selfPeer = [TGDatabaseInstance() loadConversationWithId:TGTelegraphInstance.clientUserId];
+        //[currentPeers insertObject:selfPeer atIndex:0];
+        
+        _currentPeers = currentPeers;
     }
     return _currentPeers;
 }
@@ -572,6 +619,46 @@ const CGFloat TGShareBottomInset = 0.0f;
     _tableView.scrollIndicatorInsets = _tableView.contentInset;
 }
 
++ (UIEdgeInsets)safeAreaInsetForOrientation:(UIInterfaceOrientation)orientation
+{
+    CGFloat height = MAX([UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad || (int)height != 812)
+        return UIEdgeInsetsMake(20.0f, 0.0f, 0.0f, 0.0f);
+    
+    switch (orientation)
+    {
+        case UIInterfaceOrientationLandscapeLeft:
+        case UIInterfaceOrientationLandscapeRight:
+            return UIEdgeInsetsMake(0.0f, 44.0f, 21.0f, 44.0f);
+            
+            
+        default:
+            return UIEdgeInsetsMake(44.0f, 0.0f, 34.0f, 0.0f);
+    }
+}
+
+- (UIEdgeInsets)safeAreaInset
+{
+    return [TGShareRecipientController safeAreaInsetForOrientation:self.interfaceOrientation];
+}
+
+- (void)updateSafeAreaInset
+{
+    UIEdgeInsets safeAreaInset = [self safeAreaInset];
+    
+    for (UIView *view in _searchResultsTableView.subviews)
+    {
+        if (view.tag >= 1000)
+        {
+            UIView *sectionLabel = [view viewWithTag:100];
+            sectionLabel.frame =  CGRectMake(14.0f + safeAreaInset.left, 6.0f, sectionLabel.frame.size.width, sectionLabel.frame.size.height);
+            
+            UIView *clearButton = [view viewWithTag:200];
+            clearButton.frame = CGRectMake(clearButton.superview.frame.size.width - clearButton.frame.size.width - safeAreaInset.right, 0.0f, clearButton.frame.size.width, 28.0f);
+        }
+    }
+}
+
 - (void)setSearching:(bool)searching
 {
     if (_searching == searching)
@@ -579,17 +666,19 @@ const CGFloat TGShareBottomInset = 0.0f;
     
     _searching = searching;
     
+    CGFloat statusBarHeight = [self safeAreaInset].top;
+    
     if (searching)
     {
         _searchResultsTableView.hidden = false;
         _searchResultsTableView.alpha = 0.0f;
-        _searchResultsTableView.frame = CGRectMake(0.0f, 64.0f + 44.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 64.0f);
+        _searchResultsTableView.frame = CGRectMake(0.0f, statusBarHeight + 44.0f + 44.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 64.0f);
         [UIView animateWithDuration:0.25 animations:^
         {
             [self.navigationController setNavigationBarHidden:true animated:true];
             [_tableView setScrollEnabled:false];
-            [_tableView setContentOffset:CGPointMake(0.0f, -20.0f) animated:false];
-            _searchResultsTableView.frame = CGRectMake(0.0f, 64.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 64.0f);
+            [_tableView setContentOffset:CGPointMake(0.0f, -statusBarHeight) animated:false];
+            _searchResultsTableView.frame = CGRectMake(0.0f, statusBarHeight + 44.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 44.0f - statusBarHeight);
             _searchResultsTableView.alpha = 1.0f;
         }];
     }
@@ -599,8 +688,8 @@ const CGFloat TGShareBottomInset = 0.0f;
         {
             [self.navigationController setNavigationBarHidden:false animated:false];
             [_tableView setScrollEnabled:true];
-            [_tableView setContentOffset:CGPointMake(0.0f, -64.0f) animated:false];
-            _searchResultsTableView.frame = CGRectMake(0.0f, 64.0f + 44.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 64.0f);
+            [_tableView setContentOffset:CGPointMake(0.0f, -44.0f - statusBarHeight) animated:false];
+            _searchResultsTableView.frame = CGRectMake(0.0f, statusBarHeight + 44.0f + 44.0f, _searchDimView.frame.size.width, _searchDimView.frame.size.height - 64.0f);
             _searchResultsTableView.alpha = 0.0f;
         } completion:^(BOOL finished)
         {
@@ -640,6 +729,12 @@ const CGFloat TGShareBottomInset = 0.0f;
         
         strongSelf->_topModels = next[@"top"];
         strongSelf->_recentModels = next[@"recent"];
+        
+        NSMutableDictionary *mergedUsers = [strongSelf->_userModels mutableCopy];
+        if (mergedUsers == nil)
+            mergedUsers = [[NSMutableDictionary alloc] init];
+        [mergedUsers addEntriesFromDictionary:next[@"users"]];
+        strongSelf->_userModels = mergedUsers;
         [strongSelf updateRecents];
     }]];
 }
@@ -677,10 +772,27 @@ const CGFloat TGShareBottomInset = 0.0f;
             if (strongSelf != nil)
             {
                 NSMutableArray *sections = [[NSMutableArray alloc] init];
+                NSMutableDictionary *existingPeerIds = [[NSMutableDictionary alloc] init];
+                existingPeerIds[@(TGPeerIdPrivate)] = [[NSMutableSet alloc] init];
+                existingPeerIds[@(TGPeerIdGroup)] = [[NSMutableSet alloc] init];
+                existingPeerIds[@(TGPeerIdChannel)] = [[NSMutableSet alloc] init];
+                
+                for (TGChatModel *model in results[1][@"chats"])
+                {
+                    [existingPeerIds[@(model.peerId.namespaceId)] addObject:@(model.peerId.peerId)];
+                }
+                
+                NSMutableArray *filteredRemoteResults = [[NSMutableArray alloc] init];
+                for (TGChatModel *model in results[0][@"chats"])
+                {
+                    if (![existingPeerIds[@(model.peerId.namespaceId)] containsObject:@(model.peerId.peerId)])
+                        [filteredRemoteResults addObject:model];
+                }
+        
                 if (((NSArray *)results[1][@"chats"]).count != 0)
                     [sections addObject:@{@"chats": results[1][@"chats"], @"users": results[1][@"users"]}];
                 if (((NSArray *)results[0][@"chats"]).count != 0)
-                    [sections addObject:@{@"chats": results[0][@"chats"], @"users": results[0][@"users"]}];
+                    [sections addObject:@{@"chats": filteredRemoteResults, @"users": results[0][@"users"]}];
                 
                 [strongSelf setSearchResultsSections:sections];
             }
@@ -716,7 +828,7 @@ const CGFloat TGShareBottomInset = 0.0f;
     return 0.0f;
 }
 
-- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)__unused section
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section
 {
     if (tableView == _tableView)
         return nil;
@@ -732,6 +844,7 @@ const CGFloat TGShareBottomInset = 0.0f;
         return nil;
     
     UIView *sectionContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 10, 10)];
+    sectionContainer.tag = 1000 + section;
     
     sectionContainer.clipsToBounds = false;
     sectionContainer.opaque = false;
@@ -740,7 +853,7 @@ const CGFloat TGShareBottomInset = 0.0f;
     UIView *sectionView = [[UIView alloc] initWithFrame:CGRectMake(0, first ? 0 : -1, 10, first ? 10 : 11)];
     sectionView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     
-    sectionView.backgroundColor = TGColorWithHex(0xf7f7f7);
+    sectionView.backgroundColor = [UIColor hexColor:0xf7f7f7];
     [sectionContainer addSubview:sectionView];
     
     UILabel *sectionLabel = [[UILabel alloc] init];
@@ -751,21 +864,22 @@ const CGFloat TGShareBottomInset = 0.0f;
     
     NSString *title = isRecents ? NSLocalizedString(@"Share.RecentSection", nil) : NSLocalizedString(@"Share.PeopleSection", nil);
     sectionLabel.text = [title uppercaseString];
-    sectionLabel.textColor = TGColorWithHex(0x8e8e93);
+    sectionLabel.textColor = [UIColor hexColor:0x8e8e93];
     [sectionLabel sizeToFit];
-    sectionLabel.frame = CGRectMake(14.0f, 6.0f, sectionLabel.frame.size.width, sectionLabel.frame.size.height);
+    sectionLabel.frame = CGRectMake(14.0f + [self safeAreaInset].left, 6.0f, sectionLabel.frame.size.width, sectionLabel.frame.size.height);
     [sectionContainer addSubview:sectionLabel];
     
     if (isRecents)
     {
         TGShareButton *clearButton = [[TGShareButton alloc] init];
+        clearButton.tag = 200;
         [clearButton setTitle:NSLocalizedString(@"Share.RecentSectionClear", nil) forState:UIControlStateNormal];
-        [clearButton setTitleColor:TGColorWithHex(0x8e8e93)];
+        [clearButton setTitleColor:[UIColor hexColor:0x8e8e93]];
         clearButton.titleLabel.font = [UIFont systemFontOfSize:14];
         [clearButton setContentEdgeInsets:UIEdgeInsetsMake(0.0f, 8.0f, 0.0f, 8.0f)];
         [clearButton addTarget:self action:@selector(clearButtonPressed) forControlEvents:UIControlEventTouchUpInside];
         [clearButton sizeToFit];
-        clearButton.frame = CGRectMake(sectionContainer.frame.size.width - clearButton.frame.size.width, 0.0f, clearButton.frame.size.width, 28.0f);
+        clearButton.frame = CGRectMake(sectionContainer.frame.size.width - clearButton.frame.size.width - [self safeAreaInset].right, 0.0f, clearButton.frame.size.width, 28.0f);
         clearButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
         [sectionContainer addSubview:clearButton];
     }
@@ -799,8 +913,7 @@ const CGFloat TGShareBottomInset = 0.0f;
     
     _keyboardHeight = keyboardHeight;
 
-    
-    _bottomInset = MAX(TGShareBottomInset, keyboardHeight + 44.0f);
+    _bottomInset = MAX(TGShareBottomInset + [self safeAreaInset].bottom, keyboardHeight + 44.0f);
     
     if ([self isViewLoaded])
     {
@@ -811,7 +924,7 @@ const CGFloat TGShareBottomInset = 0.0f;
     keyboardHeight = MAX(keyboardHeight, 0.0f);
     _keyboardHeight = keyboardHeight;
     
-    [_captionPanel adjustForOrientation:UIInterfaceOrientationPortrait keyboardHeight:keyboardHeight duration:duration animationCurve:curve];
+    [_captionPanel adjustForOrientation:UIInterfaceOrientationPortrait keyboardHeight:keyboardHeight safeAreaInset:[self safeAreaInset] duration:duration animationCurve:curve];
     
     CGFloat finalHeight = _contentAreaHeight - _keyboardHeight;
     [_captionPanel setContentAreaHeight:finalHeight];
@@ -821,7 +934,7 @@ const CGFloat TGShareBottomInset = 0.0f;
 {
     CGFloat keyboardHeight = 0.0f;
     
-    _bottomInset = MAX(TGShareBottomInset, keyboardHeight);
+    _bottomInset = MAX(TGShareBottomInset + [self safeAreaInset].bottom, keyboardHeight);
     
     if ([self isViewLoaded])
     {
@@ -837,7 +950,7 @@ const CGFloat TGShareBottomInset = 0.0f;
 
 - (void)inputPanelWillChangeHeight:(TGShareCaptionPanel *)inputPanel height:(CGFloat)__unused height duration:(NSTimeInterval)duration animationCurve:(int)animationCurve
 {
-    [inputPanel adjustForOrientation:UIInterfaceOrientationPortrait keyboardHeight:_keyboardHeight duration:duration animationCurve:animationCurve];
+    [inputPanel adjustForOrientation:UIInterfaceOrientationPortrait keyboardHeight:_keyboardHeight safeAreaInset:[self safeAreaInset] duration:duration animationCurve:animationCurve];
     
     [self updateTableInset];
 }

@@ -24,6 +24,8 @@
 @class TGMessageViewsViewModel;
 @class TGModernLabelViewModel;
 
+@class TGPresentation;
+
 extern bool debugShowMessageIds;
 
 @interface TGContentBubbleViewModel : TGMessageViewModel
@@ -33,6 +35,7 @@ extern bool debugShowMessageIds;
     TGModernTextViewModel *_authorNameModel;
     TGModernTextViewModel *_viaUserModel;
     TGModernTextViewModel *_authorSignatureModel;
+    TGModernTextViewModel *_adminModel;
     NSString *_authorSignature;
     TGUser *_viaUser;
     TGModernTextViewModel *_forwardedHeaderModel;
@@ -49,13 +52,18 @@ extern bool debugShowMessageIds;
     TGModernImageViewModel *_unsentButtonModel;
     
     bool _incoming;
-    bool _incomingAppearance;
     int _deliveryState;
     bool _read;
     int32_t _date;
+    bool _byAdmin;
+    bool _savedMessage;
     
     bool _hasAvatar;
     bool _inhibitChecks;
+    bool _ignoreEditing;
+    bool _ignoreViews;
+    bool _inhibitShare;
+    bool _inhibitContentAnimation;
     
     int64_t _forwardedPeerId;
     int64_t _forwardedMessageId;
@@ -72,7 +80,7 @@ extern bool debugShowMessageIds;
 - (instancetype)initWithMessage:(TGMessage *)message authorPeer:(id)authorPeer viaUser:(TGUser *)viaUser context:(TGModernViewContext *)context;
 
 - (void)setAuthorNameColor:(UIColor *)authorNameColor;
-- (void)setForwardHeader:(id)forwardPeer forwardAuthor:(id)forwardAuthor messageId:(int32_t)messageId;
+- (void)setForwardHeader:(id)forwardPeer forwardAuthor:(id)forwardAuthor messageId:(int32_t)messageId forwardSignature:(NSString *)forwardSignature;
 - (void)setReplyHeader:(TGMessage *)replyHeader peer:(id)peer;
 - (void)setWebPageFooter:(TGWebPageMediaAttachment *)webPage invoice:(TGInvoiceMediaAttachment *)invoice viewStorage:(TGModernViewStorage *)viewStorage;
 
@@ -88,6 +96,6 @@ extern bool debugShowMessageIds;
 - (void)layoutContentForHeaderHeight:(CGFloat)headerHeight containerSize:(CGSize)containerSize;
 - (CGSize)contentSizeForContainerSize:(CGSize)containerSize needsContentsUpdate:(bool *)needsContentsUpdate infoWidth:(CGFloat)infoWidth;
 
-+ (TGReplyHeaderModel *)replyHeaderModelFromMessage:(TGMessage *)replyHeader peer:(id)peer incoming:(bool)incoming system:(bool)system;
++ (TGReplyHeaderModel *)replyHeaderModelFromMessage:(TGMessage *)replyHeader peer:(id)peer incoming:(bool)incoming system:(bool)system presentation:(TGPresentation *)presentation;
 
 @end

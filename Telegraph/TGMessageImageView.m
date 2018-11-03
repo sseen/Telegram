@@ -1,31 +1,23 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGMessageImageView.h"
+
+#import <LegacyComponents/LegacyComponents.h>
 
 #import <AVFoundation/AVFoundation.h>
 
-#import "UIImage+TG.h"
-#import "TGModernButton.h"
+#import <LegacyComponents/UIImage+TG.h>
+#import <LegacyComponents/TGModernButton.h>
 
 #import "TGMessageImageViewModel.h"
 
-#import "TGMessageImageViewOverlayView.h"
+#import <LegacyComponents/TGMessageImageViewOverlayView.h>
 #import "TGMessageImageViewTimestampView.h"
 #import "TGMessageImageAdditionalDataView.h"
-#import "TGStaticBackdropImageData.h"
+#import <LegacyComponents/TGStaticBackdropImageData.h>
 
-#import "TGModernGalleryTransitionView.h"
-
-#import "TGFont.h"
+#import <LegacyComponents/TGModernGalleryTransitionView.h>
 
 #import "TGInlineVideoView.h"
-#import "TGModernGalleryVideoView.h"
+#import <LegacyComponents/TGModernGalleryVideoView.h>
 
 #import "TGAudioSessionManager.h"
 
@@ -40,9 +32,6 @@ static const CGFloat additionalDataLeftPadding = 6.0f;
 static const CGFloat additionalDataTopPadding = 6.0f;
 
 @interface TGMessageImageViewContainer () <TGModernGalleryTransitionView>
-{
-    TGMessageImageViewTimestampView *_timestampView;
-}
 
 @end
 
@@ -77,6 +66,7 @@ static const CGFloat additionalDataTopPadding = 6.0f;
 @property (nonatomic, strong) NSString *viewStateIdentifier;
 
 @property (nonatomic, strong) TGMessageImageViewTimestampView *timestampView;
+@property (nonatomic, readonly) bool timestampUnlimitedWidth;
 
 @end
 
@@ -112,8 +102,13 @@ static const CGFloat additionalDataTopPadding = 6.0f;
     if (self != nil)
     {
         _overlayDiameter = 50.0f;
+        _timestampTextColor = [UIColor whiteColor];
+        
+        if (iosMajorVersion() >= 11)
+            self.accessibilityIgnoresInvertColors = true;
         
         _buttonView = [[TGModernButton alloc] initWithFrame:CGRectMake(0.0f, 0.0f, _overlayDiameter, _overlayDiameter)];
+        _buttonView.adjustsImageWhenHighlighted = false;
         _buttonView.exclusiveTouch = true;
         _buttonView.modernHighlight = true;
         [_buttonView addTarget:self action:@selector(actionButtonPressed) forControlEvents:UIControlEventTouchUpInside];
@@ -122,8 +117,6 @@ static const CGFloat additionalDataTopPadding = 6.0f;
         [_overlayView setRadius:_overlayDiameter];
         _overlayView.userInteractionEnabled = false;
         [_buttonView addSubview:_overlayView];
-
-        _buttonView.highlightImage = [self highlightImageForDiameter:_overlayDiameter];
     }
     return self;
 }
@@ -161,7 +154,7 @@ static const CGFloat additionalDataTopPadding = 6.0f;
     [super setFrame:frame];
     
     CGRect buttonFrame = _buttonView.frame;
-    buttonFrame.origin = CGPointMake(CGFloor(frame.size.width - buttonFrame.size.width) / 2.0f, CGFloor(frame.size.height - buttonFrame.size.height) / 2.0f);
+    buttonFrame.origin = CGPointMake(TGScreenPixelFloor((frame.size.width - buttonFrame.size.width) / 2.0f), TGScreenPixelFloor((frame.size.height - buttonFrame.size.height) / 2.0f));
     if (!CGRectEqualToRect(_buttonView.frame, buttonFrame))
     {
         _buttonView.frame = buttonFrame;
@@ -185,7 +178,7 @@ static const CGFloat additionalDataTopPadding = 6.0f;
 
 - (void)_updateTimestampViewFrame
 {
-    CGFloat maxTimestampWidth = self.frame.size.width - 34.0f;
+    CGFloat maxTimestampWidth = _timestampUnlimitedWidth ? 1000.0f : self.frame.size.width - 34.0f;
     CGFloat nominalMaximumTimestampWidth = maxTimestampWidth + 34.0f;
     if (_flexibleTimestamp) {
         maxTimestampWidth = 120.0f;
@@ -254,7 +247,7 @@ static const CGFloat additionalDataTopPadding = 6.0f;
     
     [_overlayView setRadius:overlayDiameter];
     
-    _buttonView.frame = CGRectMake(CGFloor(self.frame.size.width - overlayDiameter) / 2.0f, CGFloor(self.frame.size.height - overlayDiameter) / 2.0f, overlayDiameter, overlayDiameter);
+    _buttonView.frame = CGRectMake(TGScreenPixelFloor((self.frame.size.width - overlayDiameter) / 2.0f), TGScreenPixelFloor((self.frame.size.height - overlayDiameter) / 2.0f), overlayDiameter, overlayDiameter);
     
     if (ABS(overlayDiameter - _overlayDiameter) > FLT_EPSILON)
     {
@@ -364,6 +357,17 @@ static const CGFloat additionalDataTopPadding = 6.0f;
                 
                 break;
             }
+            case TGMessageImageViewOverlayCompleted:
+            {
+                if (_buttonView.superview == nil)
+                    [self addSubview:_buttonView];
+                
+                _buttonView.alpha = 1.0f;
+                
+                [_overlayView setCompletedAnimated:animated];
+            
+                break;
+            }
             case TGMessageImageViewOverlayNone:
             default:
             {
@@ -432,9 +436,51 @@ static const CGFloat additionalDataTopPadding = 6.0f;
     [_additionalDataView setTimestampColor:color];
 }
 
+- (void)setTimestampTextColor:(UIColor *)color
+{
+    _timestampTextColor = color;
+    
+    [_timestampView setTimestampTextColor:color];
+    [_additionalDataView setTimestampTextColor:color];
+}
+
+- (void)setServiceTimestampStyle:(bool)serviceTimestampStyle
+{
+    _serviceTimestampStyle = serviceTimestampStyle;
+    
+    [_timestampView setServiceStyle:serviceTimestampStyle];
+}
+
 - (void)setTimestampHidden:(bool)timestampHidden
 {
+    _timestampView.alpha = timestampHidden ? 0.0f : 1.0f;
     _timestampView.hidden = timestampHidden;
+    if (!timestampHidden)
+        [_timestampView setNeedsDisplay];
+}
+
+- (void)setTimestampHidden:(bool)timestampHidden animated:(bool)animated
+{
+    if (animated)
+    {
+        if (_timestampView.hidden != timestampHidden)
+        {
+            _timestampView.hidden = false;
+            _timestampView.alpha = timestampHidden ? 1.0f : 0.0f;
+            
+            [UIView animateWithDuration:0.2 animations:^
+            {
+                _timestampView.alpha = timestampHidden ? 0.0f : 1.0f;
+            } completion:^(__unused BOOL finished)
+            {
+                _timestampView.hidden = timestampHidden;
+            }];
+        }
+    }
+    else
+    {
+        [self setTimestampHidden:timestampHidden];
+    }
 }
 
 - (void)setTimestampPosition:(int)timestampPosition
@@ -465,6 +511,7 @@ static const CGFloat additionalDataTopPadding = 6.0f;
             _additionalDataView.frame = frame;
     
         [_additionalDataView setTimestampColor:_timestampColor];
+        [_additionalDataView setTimestampTextColor:_timestampTextColor];
         [_additionalDataView setBackdropArea:_additionalDataBackdropArea transitionDuration:0.0];
         [_additionalDataView setText:additionalDataString];
         
@@ -513,6 +560,16 @@ static const CGFloat additionalDataTopPadding = 6.0f;
 {
     _timestampOffset = timestampOffset;
     [self _updateTimestampViewFrame];
+}
+
+- (void)setTimestampUnlimitedWidth:(bool)unlimitedWidth
+{
+    if (_timestampUnlimitedWidth != unlimitedWidth)
+    {
+        _timestampUnlimitedWidth = unlimitedWidth;
+        [self _updateTimestampViewFrame];
+        [_timestampView updateProgressPosition];
+    }
 }
 
 - (void)setIsBroadcast:(bool)isBroadcast
@@ -682,6 +739,7 @@ static const CGFloat additionalDataTopPadding = 6.0f;
     if (_inlineVideoView == nil) {
         _inlineVideoView = [[TGInlineVideoView alloc] initWithFrame:[self _videoFrame]];
         _inlineVideoView.cornerRadius = _inlineVideoCornerRadius;
+        _inlineVideoView.position = _inlineVideoPosition;
         _inlineVideoView.videoSize = _inlineVideoSize;
         [self insertSubview:_inlineVideoView atIndex:0];
     }
@@ -715,6 +773,13 @@ static const CGFloat additionalDataTopPadding = 6.0f;
     _inlineVideoCornerRadius = inlineVideoCornerRadius;
     
     _inlineVideoView.cornerRadius = inlineVideoCornerRadius;
+}
+
+- (void)setInlineVideoPosition:(int)inlineVideoPosition
+{
+    _inlineVideoPosition = inlineVideoPosition;
+    
+    _inlineVideoView.position = inlineVideoPosition;
 }
 
 - (void)setVideoView:(TGModernGalleryVideoView *)videoView
@@ -808,18 +873,12 @@ static const CGFloat additionalDataTopPadding = 6.0f;
 - (UIImage *)transitionImage
 {
     UIGraphicsBeginImageContextWithOptions(self.frame.size, false, 0.0f);
-    if (false && [UIView instancesRespondToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)])
-    {
-        [_imageView drawViewHierarchyInRect:_imageView.frame afterScreenUpdates:false];
-        [_timestampView drawViewHierarchyInRect:_timestampView.frame afterScreenUpdates:false];
-    }
-    else
-    {
-        CGContextRef context = UIGraphicsGetCurrentContext();
-        [_imageView.image drawInRect:_imageView.frame blendMode:kCGBlendModeCopy alpha:1.0f];
-        CGContextTranslateCTM(context, _timestampView.frame.origin.x, _timestampView.frame.origin.y);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    [_imageView.image drawInRect:_imageView.frame blendMode:kCGBlendModeCopy alpha:1.0f];
+    CGContextTranslateCTM(context, _timestampView.frame.origin.x, _timestampView.frame.origin.y);
+    
+    if (!_imageView.timestampUnlimitedWidth)
         [_timestampView.layer renderInContext:context];
-    }
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     

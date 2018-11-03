@@ -1,22 +1,29 @@
 #import "TGUserInfoTextCollectionItemView.h"
 
-#import "TGFont.h"
-#import "TGImageUtils.h"
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGModernTextViewModel.h"
 
 #import "TGTelegraphConversationMessageAssetsSource.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 #import "TGTelegraph.h"
+
+#import "TGPresentation.h"
 
 @interface TGUserInfoTextCollectionItemViewTextView : UIButton {
     NSArray *_currentLinkSelectionViews;
     NSString *_currentLink;
+    
+    UILongPressGestureRecognizer *_longPressGestureRecognizer;
 }
 
 @property (nonatomic, copy) void (^followLink)(NSString *);
+@property (nonatomic, copy) void (^holdLink)(NSString *);
 @property (nonatomic, readonly) bool trackingLink;
 @property (nonatomic, strong) TGModernTextViewModel *textModel;
+@property (nonatomic, strong) UIColor *linkColor;
+@property (nonatomic, strong) UIColor *linkHighlightColor;
 
 @end
 
@@ -27,8 +34,21 @@
     if (self != nil) {
         self.opaque = false;
         self.backgroundColor = [UIColor clearColor];
+        
+        _longPressGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+        [self addGestureRecognizer:_longPressGestureRecognizer];
     }
     return self;
+}
+
+- (void)handleLongPress:(UILongPressGestureRecognizer *)gestureRecognizer {
+    if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
+        _trackingLink = false;
+        
+        if (_holdLink) {
+            _holdLink(_currentLink);
+        }
+    }
 }
 
 - (void)setTextModel:(TGModernTextViewModel *)textModel {
@@ -77,6 +97,12 @@
 - (void)followLink:(NSString *)link {
     if (_followLink) {
         _followLink(link);
+    }
+}
+
+- (void)holdLink:(NSString *)link {
+    if (_holdLink) {
+        _holdLink(link);
     }
 }
 
@@ -267,6 +293,8 @@
     
     UILabel *_labelView;
     TGUserInfoTextCollectionItemViewTextView *_textContentView;
+    
+    TGCheckButtonView *_checkView;
 }
 
 @end
@@ -312,6 +340,32 @@
     return self;
 }
 
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    [super setPresentation:presentation];
+    
+    _labelView.textColor = presentation.pallete.collectionMenuTextColor;
+    _separatorView.backgroundColor = presentation.pallete.collectionMenuSeparatorColor;
+    _textContentView.linkColor = presentation.pallete.linkColor;
+}
+
+- (void)setChecking:(bool)checking
+{
+    if (_checkView == nil)
+    {
+        _checkView = [[TGCheckButtonView alloc] initWithStyle:TGCheckButtonStyleDefaultBlue pallete:self.presentation.checkButtonPallete];
+        _checkView.userInteractionEnabled = false;
+        [self addSubview:_checkView];
+    }
+    _checkView.hidden = !checking;
+    [self setNeedsLayout];
+}
+
+- (void)setIsChecked:(bool)checked animated:(bool)animated
+{
+    [_checkView setSelected:checked animated:animated];
+}
+
 - (void)setTitle:(NSString *)title
 {
     _labelView.text = title;
@@ -334,19 +388,24 @@
     
     CGRect bounds = self.bounds;
     
+    bool hasCheck = _checkView != nil && !_checkView.hidden;
+    
+    _checkView.frame = CGRectMake(14.0f + self.safeAreaInset.left, TGScreenPixelFloor((self.frame.size.height - _checkView.frame.size.height) / 2.0f), _checkView.frame.size.width, _checkView.frame.size.height);
+    
     CGFloat separatorHeight = TGScreenPixel;
-    _separatorView.frame = CGRectMake(35.0f, bounds.size.height - separatorHeight, bounds.size.width - 35.0f, separatorHeight);
+    CGFloat separatorInset = (hasCheck ? 60.0f : 15.0f) + self.safeAreaInset.left;
+    _separatorView.frame = CGRectMake(separatorInset, bounds.size.height - separatorHeight, bounds.size.width - separatorInset, separatorHeight);
     
-    CGFloat leftPadding = 35.0f + TGRetinaPixel;
+    CGFloat leftPadding = (hasCheck ? 60.0f : 15.0f) + TGScreenPixel + self.safeAreaInset.left;
     
-    CGSize labelSize = [_labelView.text sizeWithFont:_labelView.font constrainedToSize:CGSizeMake(bounds.size.width - leftPadding - 10.0f, CGFLOAT_MAX) lineBreakMode:NSLineBreakByWordWrapping];
+    CGSize labelSize = [_labelView.text sizeWithFont:_labelView.font constrainedToSize:CGSizeMake(bounds.size.width - leftPadding - self.safeAreaInset.right - 10.0f, CGFLOAT_MAX) lineBreakMode:NSLineBreakByWordWrapping];
     labelSize.width = CGCeil(labelSize.width);
     labelSize.height = CGCeil(labelSize.height);
     _labelView.frame = CGRectMake(leftPadding, 11.0f, labelSize.width, labelSize.height);
     
-    CGRect frame = CGRectMake(35.0f, CGFloor(labelSize.height + 1.0f) + 8.0f, _textContentView.textModel.frame.size.width, _textContentView.textModel.frame.size.height);
+    CGRect frame = CGRectMake((hasCheck ? 60.0f : 15.0f) + self.safeAreaInset.left, CGFloor(labelSize.height + 1.0f) + 8.0f, _textContentView.textModel.frame.size.width, _textContentView.textModel.frame.size.height);
     
-    if (!CGSizeEqualToSize(_textContentView.frame.size, frame.size))
+    if (!CGSizeEqualToSize(_textContentView.frame.size, frame.size) || !CGPointEqualToPoint(_textContentView.frame.origin, frame.origin))
     {
         _textContentView.frame = frame;
         [_textContentView setNeedsDisplay];
@@ -355,6 +414,10 @@
 
 - (void)setFollowLink:(void (^)(NSString *))followLink {
     _textContentView.followLink = followLink;
+}
+
+- (void)setHoldLink:(void (^)(NSString *))holdLink {
+    _textContentView.holdLink = holdLink;
 }
 
 @end

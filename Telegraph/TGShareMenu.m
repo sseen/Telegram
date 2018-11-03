@@ -1,9 +1,10 @@
 #import "TGShareMenu.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGAppDelegate.h"
-#import "TGViewController.h"
-#import "TGMenuSheetController.h"
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGMenuSheetController.h>
+#import <LegacyComponents/TGProgressWindow.h>
 
 #import "TGShareSearchItemView.h"
 #import "TGShareCollectionItemView.h"
@@ -13,8 +14,11 @@
 #import "TGTelegraph.h"
 #import "TGGlobalMessageSearchSignals.h"
 #import "TGChatSearchController.h"
-#import "TGConversation.h"
-#import "TGUser.h"
+#import "TGDialogListController.h"
+
+#import "TGLegacyComponentsContext.h"
+
+#import "TGPresentation.h"
 
 @interface TGDocumentInteractionControllerHandle : NSObject <UIDocumentInteractionControllerDelegate>
 {
@@ -30,7 +34,7 @@
 
 + (TGMenuSheetController *)presentInParentController:(TGViewController *)parentController menuController:(TGMenuSheetController *)menuController buttonTitle:(NSString *)buttonTitle buttonAction:(void (^)(void))buttonAction shareAction:(void (^)(NSArray *peerIds, NSString *caption))shareAction externalShareItemSignal:(id)externalShareItemSignal sourceView:(UIView *)sourceView sourceRect:(CGRect (^)(void))sourceRect barButtonItem:(UIBarButtonItem *)barButtonItem
 {
-    void (^externalShareBlock)(TGViewController *, UIView *, CGRect (^)(void)) = ^(TGViewController *viewController, UIView *sourceView, CGRect (^sourceRect)(void))
+    void (^externalShareBlock)(TGViewController *, UIView *, CGRect (^)(void)) = ^(__unused TGViewController *viewController, UIView *sourceView, CGRect (^sourceRect)(void))
     {
         TGProgressWindow *progressWindow = [[TGProgressWindow alloc] init];
         [progressWindow showWithDelay:0.2];
@@ -56,6 +60,7 @@
             else
             {
                 UIActivityViewController *activityController = [[UIActivityViewController alloc] initWithActivityItems:@[next] applicationActivities:nil];
+                [viewController presentViewController:activityController animated:true completion:nil];
                 if (iosMajorVersion() >= 8 && TGAppDelegateInstance.rootController.currentSizeClass == UIUserInterfaceSizeClassRegular && (sourceView != nil || barButtonItem != nil))
                 {
                     if (barButtonItem != nil)
@@ -70,7 +75,6 @@
                     }
                     activityController.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
                 }
-                [viewController presentViewController:activityController animated:true completion:nil];
             }
             
             [progressWindow dismiss:true];
@@ -86,7 +90,7 @@
     TGMenuSheetController *controller = nil;
     if (menuController == nil)
     {
-        controller = [[TGMenuSheetController alloc] init];
+        controller = [[TGMenuSheetController alloc] initWithContext:[TGLegacyComponentsContext shared] dark:false];
         controller.dismissesByOutsideTap = true;
         controller.hasSwipeGesture = true;
         controller.narrowInLandscape = true;
@@ -104,11 +108,13 @@
     NSMutableArray *itemViews = [[NSMutableArray alloc] init];
     
     TGShareCollectionItemView *collectionItem = [[TGShareCollectionItemView alloc] init];
+    collectionItem.presentation = TGPresentation.current;
     collectionItem.hasActionButton = (buttonTitle.length > 0);
-    
-    TGShareSearchItemView *searchItem = [[TGShareSearchItemView alloc] init];
-    
+   
     __weak TGMenuSheetController *weakController = controller;
+    TGShareSearchItemView *searchItem = [[TGShareSearchItemView alloc] init];
+    searchItem.presentation = TGPresentation.current;
+    
     if (externalShareItemSignal != nil)
     {
         [searchItem setExternalButtonHidden:false];
@@ -146,7 +152,11 @@
             shareAction(strongCollectionItem.peerIds, caption);
         
         [strongController dismissAnimated:true];
+        
+        if ([strongCollectionItem.peerIds containsObject:@(TGTelegraphInstance.clientUserId)])
+            [TGAppDelegateInstance.rootController.dialogListController requestSavedMessagesTooltip];
     }];
+    sendItem.presentation = TGPresentation.current;
     
     __weak TGShareSendButtonItemView *weakSendItem = sendItem;
     searchItem.didBeginSearch = ^
@@ -201,7 +211,10 @@
     {
         __strong TGShareCollectionItemView *strongCollectionItem = weakCollectionItem;
         if (strongCollectionItem != nil)
+        {
             [strongCollectionItem setExpanded];
+            [strongCollectionItem requestMenuLayoutUpdate];
+        }
     };
     
     collectionItem.selectionChanged = ^(NSArray *selectedPeerIds, NSDictionary *peers)

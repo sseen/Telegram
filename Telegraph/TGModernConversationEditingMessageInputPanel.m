@@ -1,16 +1,15 @@
 #import "TGModernConversationEditingMessageInputPanel.h"
 
-#import "TGPeerIdAdapter.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGModernButton.h"
+#import <LegacyComponents/TGModernButton.h>
+
+#import "TGGroupManagementSignals.h"
 
 #import "TGDatabase.h"
 #import "TGInterfaceAssets.h"
 
-#import "TGFont.h"
-#import "TGImageUtils.h"
-
-#import "TGImageView.h"
+#import <LegacyComponents/TGImageView.h>
 
 #import "TGSharedMediaSignals.h"
 #import "TGSharedPhotoSignals.h"
@@ -25,6 +24,8 @@
 #import "TGTelegraph.h"
 
 @interface TGModernConversationEditingMessageInputPanel () {
+    TGMessage *_message;
+    
     CGFloat _sendAreaWidth;
     CGFloat _attachmentAreaWidth;
     
@@ -72,7 +73,7 @@
         self.backgroundColor = nil;
         self.opaque = false;
         
-        UIImage *closeImage = [UIImage imageNamed:@"ReplyPanelClose.png"];
+        UIImage *closeImage = TGImageNamed(@"ReplyPanelClose.png");
         _closeButton = [[TGModernButton alloc] initWithFrame:CGRectMake(0.0f, 0.0f, closeImage.size.width, closeImage.size.height)];
         _closeButton.adjustsImageWhenHighlighted = false;
         [_closeButton setBackgroundImage:closeImage forState:UIControlStateNormal];
@@ -139,6 +140,15 @@
     [_timer invalidate];
 }
 
+- (void)setPallete:(TGConversationAssociatedInputPanelPallete *)pallete
+{
+    [super setPallete:pallete];
+    
+    _lineView.backgroundColor = pallete.accentColor;
+    [self setLargeDismissButton:_largeDismissButton];
+    [self updateMessage:_message];
+}
+
 - (void)updateTimer {
     if (_editingTimeout <= DBL_EPSILON) {
         _timerLabel.hidden = true;
@@ -176,11 +186,11 @@
     _largeDismissButton = largeDismissButton;
     
     if (largeDismissButton) {
-        UIImage *closeImage = [UIImage imageNamed:@"PinnedMessagePanelClose.png"];
+        UIImage *closeImage = self.pallete.largeCloseIcon;
         _closeButton.frame = CGRectMake(0.0f, 0.0f, closeImage.size.width, closeImage.size.height);
         [_closeButton setBackgroundImage:closeImage forState:UIControlStateNormal];
     } else {
-        UIImage *closeImage = [UIImage imageNamed:@"ReplyPanelClose.png"];
+        UIImage *closeImage = self.pallete.closeIcon;
         _closeButton.frame = CGRectMake(0.0f, 0.0f, closeImage.size.width, closeImage.size.height);
         [_closeButton setBackgroundImage:closeImage forState:UIControlStateNormal];
     }
@@ -230,11 +240,14 @@
     {
         CGSize boundsSize = CGSizeMake(self.bounds.size.width, [self preferredHeight]);
         
+        CGFloat attachmentAreaWidth = _attachmentAreaWidth + self.safeAreaInset.left;
+        CGFloat sendAreaWidth = _sendAreaWidth + self.safeAreaInset.right;
+        
         CGFloat leftPadding = 0.0f;
         if (_imageView != nil)
         {
             leftPadding += 40.0f;
-            _imageView.frame = CGRectMake(_attachmentAreaWidth + 12.0f, 6.0f, 35.0f, 35.0f);
+            _imageView.frame = CGRectMake(attachmentAreaWidth + 12.0f, 6.0f, 35.0f, 35.0f);
             
             _imageIconView.frame = CGRectMake(TGRetinaFloor((_imageView.frame.size.width - _imageIconView.frame.size.width) / 2.0f), TGRetinaFloor((_imageView.frame.size.height - _imageIconView.frame.size.height) / 2.0f), _imageIconView.frame.size.width, _imageIconView.frame.size.height);
         }
@@ -244,24 +257,26 @@
         }
         
         CGSize nameSize = [_nameLabel.text sizeWithFont:_nameLabel.font];
-        nameSize.width = MIN(nameSize.width, boundsSize.width - _attachmentAreaWidth - 40.0f - _sendAreaWidth - leftPadding);
+        nameSize.width = MIN(nameSize.width, boundsSize.width - attachmentAreaWidth - 40.0f - sendAreaWidth - leftPadding);
         
         CGSize contentLabelSize = [_contentLabel.text sizeWithFont:_contentLabel.font];
-        contentLabelSize.width = MIN(contentLabelSize.width, boundsSize.width - _attachmentAreaWidth - 40.0f - _sendAreaWidth - leftPadding);
+        contentLabelSize.width = MIN(contentLabelSize.width, boundsSize.width - attachmentAreaWidth - 40.0f - sendAreaWidth - leftPadding);
         
         if (_largeDismissButton) {
-            _closeButton.frame = CGRectMake(boundsSize.width - _sendAreaWidth - _closeButton.frame.size.width, CGFloor((boundsSize.height - _closeButton.frame.size.height) / 2.0f + 4.0f) , _closeButton.frame.size.width, _closeButton.frame.size.height);
+            _closeButton.frame = CGRectMake(boundsSize.width - sendAreaWidth - _closeButton.frame.size.width, CGFloor((boundsSize.height - _closeButton.frame.size.height) / 2.0f + 4.0f) , _closeButton.frame.size.width, _closeButton.frame.size.height);
         } else {
-            _closeButton.frame = CGRectMake(boundsSize.width - _sendAreaWidth - _closeButton.frame.size.width - 4.0f, 11.0f, _closeButton.frame.size.width, _closeButton.frame.size.height);
+            _closeButton.frame = CGRectMake(boundsSize.width - sendAreaWidth - _closeButton.frame.size.width - 4.0f, 11.0f, _closeButton.frame.size.width, _closeButton.frame.size.height);
         }
-        _lineView.frame = CGRectMake(_attachmentAreaWidth + 4.0f, 6.0f + _lineInsets.top, 2.0f, boundsSize.height - 6.0f - _lineInsets.top - _lineInsets.bottom);
-        _nameLabel.frame = CGRectMake(_attachmentAreaWidth + 16.0f + leftPadding, 5.0f, CGCeil(nameSize.width), CGCeil(nameSize.height));
+        _lineView.frame = CGRectMake(attachmentAreaWidth + 4.0f, 6.0f + _lineInsets.top, 2.0f, boundsSize.height - 6.0f - _lineInsets.top - _lineInsets.bottom);
+        _nameLabel.frame = CGRectMake(attachmentAreaWidth + 16.0f + leftPadding, 5.0f, CGCeil(nameSize.width), CGCeil(nameSize.height));
         _timerLabel.frame = CGRectMake(CGRectGetMaxX(_nameLabel.frame) + 4.0f, _nameLabel.frame.origin.y + 2.0f, _timerLabel.frame.size.width, _timerLabel.frame.size.height);
-        _contentLabel.frame = CGRectMake(_attachmentAreaWidth + 16.0f + leftPadding, 24.0f, CGCeil(contentLabelSize.width), CGCeil(contentLabelSize.height));
+        _contentLabel.frame = CGRectMake(attachmentAreaWidth + 16.0f + leftPadding, 24.0f, CGCeil(contentLabelSize.width), CGCeil(contentLabelSize.height));
     }];
 }
 
 - (void)updateMessage:(TGMessage *)message {
+    _message = message;
+    
     [_imageView removeFromSuperview];
     _imageView = nil;
     
@@ -270,7 +285,7 @@
     
     _message = message;
     
-    UIColor *color = UIColorRGB(0x34a5ff);
+    UIColor *color = self.pallete.accentColor;
     
     NSString *title = @"";
     id author = nil;
@@ -290,7 +305,7 @@
     if (_customTitle != nil) {
         title = _customTitle;
     }
-    
+
     _nameLabel.textColor = color;
     _nameLabel.text = title;
     [self addSubview:_nameLabel];
@@ -298,10 +313,13 @@
     SSignal *imageSignal = nil;
     UIImage *imageIcon = nil;
     NSString *text = message.text;
-    UIColor *textColor = [UIColor blackColor];
+    UIColor *textColor = self.pallete.textColor;
     NSLineBreakMode lineBreakMode = NSLineBreakByTruncatingTail;
     
-    UIColor *mediaTextColor = UIColorRGB(0x8c8c92);
+    UIColor *mediaTextColor = self.pallete.secondaryTextColor;
+    
+    bool canEdit = false; // message.messageLifetime == 0;
+    bool useCaptionTitle = false;
     
     for (TGMediaAttachment *attachment in message.mediaAttachments)
     {
@@ -309,6 +327,7 @@
         {
             text = TGLocalized(@"Message.Photo");
             textColor = mediaTextColor;
+            useCaptionTitle = true;
             
             imageSignal = [TGSharedPhotoSignals squarePhotoThumbnail:(TGImageMediaAttachment *)attachment ofSize:CGSizeMake(35.0f, 35.0f) threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] pixelProcessingBlock:[TGSharedMediaSignals pixelProcessingBlockForRoundCornersOfRadius:[TGReplyHeaderModel thumbnailCornerRadius]] downloadLargeImage:true placeholder:nil];
         }
@@ -316,19 +335,22 @@
         {
             text = TGLocalized(@"Message.Video");
             textColor = mediaTextColor;
+            useCaptionTitle = true;
             
             imageSignal = [TGSharedVideoSignals squareVideoThumbnail:(TGVideoMediaAttachment *)attachment ofSize:CGSizeMake(35.0f, 35.0f) threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] pixelProcessingBlock:[TGSharedMediaSignals pixelProcessingBlockForRoundCornersOfRadius:[TGReplyHeaderModel thumbnailCornerRadius]]];
-            imageIcon = [UIImage imageNamed:@"ReplyHeaderThumbnailVideoPlay.png"];
         }
         else if ([attachment isKindOfClass:[TGAudioMediaAttachment class]])
         {
             text = TGLocalized(@"Message.Audio");
             textColor = mediaTextColor;
+            useCaptionTitle = true;
         }
         else if ([attachment isKindOfClass:[TGDocumentMediaAttachment class]])
         {
             bool isSticker = false;
             bool isVoice = false;
+            useCaptionTitle = true;
+            
             for (id attribute in ((TGDocumentMediaAttachment *)attachment).attributes)
             {
                 if ([attribute isKindOfClass:[TGDocumentAttributeSticker class]])
@@ -337,6 +359,7 @@
                     break;
                 }
                 else if ([attribute isKindOfClass:[TGDocumentAttributeAudio class]]) {
+                    canEdit = false;
                     isVoice = ((TGDocumentAttributeAudio *)attribute).isVoice;
                 }
             }
@@ -367,7 +390,10 @@
         }
         else if ([attachment isKindOfClass:[TGLocationMediaAttachment class]])
         {
-            text = TGLocalized(@"Message.Location");
+            if (((TGLocationMediaAttachment *)attachment).period > 0)
+                text = TGLocalized(@"Message.LiveLocation");
+            else
+                text = TGLocalized(@"Message.Location");
             textColor = mediaTextColor;
         }
         else if ([attachment isKindOfClass:[TGContactMediaAttachment class]])
@@ -398,6 +424,9 @@
             [_imageView addSubview:_imageIconView];
         }
     }
+    
+    if (useCaptionTitle)
+        _nameLabel.text = TGLocalized(@"Conversation.EditingCaptionPanelTitle");
     
     _contentLabel.text = [text stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
     _contentLabel.textColor = textColor;

@@ -4,14 +4,12 @@
 #import <AddressBook/AddressBook.h>
 #import <CoreLocation/CoreLocation.h>
 
-#import "TGStringUtils.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGMessage.h"
-
-#import "TGImageManager.h"
+#import <LegacyComponents/TGImageManager.h>
 #import "TGDownloadManager.h"
 #import "TGVideoDownloadActor.h"
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 
 #import "TGMusicPlayerItemSignals.h"
 
@@ -109,7 +107,7 @@
         else
             [uri appendFormat:@"local-id=%" PRId64 "", localImageId];
                 
-        [uri appendFormat:@"&width=%d&height=%d&renderWidth=%d&renderHeight=%d", (int)largestSize.width, (int)largestSize.height, (int)largestSize.width, (int)largestSize.height];
+        [uri appendFormat:@"&width=%d&height=%d&renderWidth=%d&renderHeight=%d&flat=1&cornerRadius=-1", (int)largestSize.width, (int)largestSize.height, (int)largestSize.width, (int)largestSize.height];
         
         NSString *legacyFilePath = nil;
         if ([legacyCacheUrl hasPrefix:@"file://"])
@@ -179,12 +177,9 @@
         }
     }
     
-    TGDocumentAttributeSticker *sticker = nil;
     TGDocumentAttributeImageSize *imageSize = nil;
     for (id attribute in documentAttachment.attributes) {
-        if ([attribute isKindOfClass:[TGDocumentAttributeSticker class]]) {
-            sticker = (TGDocumentAttributeSticker *)attribute;
-        } else if ([attribute isKindOfClass:[TGDocumentAttributeImageSize class]]) {
+        if ([attribute isKindOfClass:[TGDocumentAttributeImageSize class]]) {
             imageSize = (TGDocumentAttributeImageSize *)attribute;
         }
     }
@@ -199,6 +194,10 @@
         [uri appendFormat:@"&size=%d", (int)documentAttachment.size];
         [uri appendFormat:@"&width=%d&height=%d", (int)imageSize.size.width, (int)imageSize.size.height];
         [uri appendFormat:@"&mime-type=%@", [TGStringUtils stringByEscapingForURL:documentAttachment.mimeType]];
+        
+        TGMediaOriginInfo *originInfo = documentAttachment.originInfo ?: [TGMediaOriginInfo mediaOriginInfoForDocumentAttachment:documentAttachment];
+        if (originInfo != nil)
+            [uri appendFormat:@"&origin_info=%@", [originInfo stringRepresentation]];
 
         id asyncTaskId = [[TGImageManager instance] beginLoadingImageAsyncWithUri:uri decode:true progress:nil partialCompletion:nil completion:^(UIImage *image)
         {
@@ -244,6 +243,9 @@
         }
     }
     
+    if (contactAttachment == nil)
+        return [SSignal fail:nil];
+    
     NSString *firstName = contactAttachment.firstName;
     NSString *lastName = contactAttachment.lastName;
     NSString *phoneNumber = contactAttachment.phoneNumber;
@@ -257,42 +259,62 @@
         contact.givenName = firstName;
         contact.familyName = lastName;
         
-        CNLabeledValue<CNPhoneNumber *> *phoneValue = [CNLabeledValue labeledValueWithLabel:nil value:[CNPhoneNumber phoneNumberWithStringValue:phoneNumber]];
-        contact.phoneNumbers = @[ phoneValue ];
-        
-        NSError *error;
-        contactData = [CNContactVCardSerialization dataWithContacts:@[ contact ] error:&error];
-        
-        if (error != nil)
-            return nil;
+        if (contactAttachment.vcard.length > 0)
+        {
+            contactData = [contactAttachment.vcard dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        else
+        {
+            CNLabeledValue<CNPhoneNumber *> *phoneValue = [CNLabeledValue labeledValueWithLabel:nil value:[CNPhoneNumber phoneNumberWithStringValue:phoneNumber]];
+            contact.phoneNumbers = @[ phoneValue ];
+            
+            NSError *error;
+            contactData = [CNContactVCardSerialization dataWithContacts:@[ contact ] error:&error];
+            if (error != nil)
+                return nil;
+        }
         
         filename = [CNContactFormatter stringFromContact:contact style:CNContactFormatterStyleFullName];
     }
     else
     {
-        ABRecordRef contact = ABPersonCreate();
-        
-        ABMutableMultiValueRef phoneNumberMultiValue  = ABMultiValueCreateMutable(kABMultiStringPropertyType);
-        ABMultiValueAddValueAndLabel(phoneNumberMultiValue, (__bridge CFTypeRef)(phoneNumber), kABPersonPhoneMobileLabel, NULL);
-        
-        CFErrorRef error = NULL;
-        if (firstName.length > 0)
-            ABRecordSetValue(contact, kABPersonFirstNameProperty, (__bridge CFTypeRef)(firstName), &error);
-        if (lastName.length > 0)
-            ABRecordSetValue(contact, kABPersonLastNameProperty, (__bridge CFTypeRef)(lastName), &error);
-        
-        ABRecordSetValue(contact, kABPersonPhoneProperty, phoneNumberMultiValue, &error);
-        
-        if (error != NULL)
-            return nil;
-        
-        contactData = (__bridge NSData *)(ABPersonCreateVCardRepresentationWithPeople((__bridge CFArrayRef)@[ (__bridge id)contact ]));
+        if (contactAttachment.vcard.length > 0)
+        {
+            contactData = [contactAttachment.vcard dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        else
+        {
+            ABRecordRef contact = ABPersonCreate();
+            
+            ABMutableMultiValueRef phoneNumberMultiValue  = ABMultiValueCreateMutable(kABMultiStringPropertyType);
+            ABMultiValueAddValueAndLabel(phoneNumberMultiValue, (__bridge CFTypeRef)(phoneNumber), kABPersonPhoneMobileLabel, NULL);
+            
+            CFErrorRef error = NULL;
+            if (firstName.length > 0)
+                ABRecordSetValue(contact, kABPersonFirstNameProperty, (__bridge CFTypeRef)(firstName), &error);
+            if (lastName.length > 0)
+                ABRecordSetValue(contact, kABPersonLastNameProperty, (__bridge CFTypeRef)(lastName), &error);
+            
+            ABRecordSetValue(contact, kABPersonPhoneProperty, phoneNumberMultiValue, &error);
+            
+            if (error != NULL) {
+                if (contact != NULL)
+                    CFRelease(contact);
+                
+                if (phoneNumberMultiValue != NULL)
+                    CFRelease(phoneNumberMultiValue);
+                
+                return [SSignal fail:nil];
+            }
+            
+            contactData = (__bridge_transfer NSData *)(ABPersonCreateVCardRepresentationWithPeople((__bridge CFArrayRef)@[ (__bridge_transfer id)contact ]));
+        }
         
         filename = [[NSString stringWithFormat:@"%@ %@", firstName, lastName] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     }
     
     if (contactData.length == 0)
-        return nil;
+        return [SSignal fail:nil];
     
     NSURL *tempDirectory = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.vcf", filename]]];
     if ([contactData writeToURL:tempDirectory atomically:true])

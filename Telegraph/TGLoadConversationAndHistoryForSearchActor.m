@@ -1,6 +1,8 @@
 #import "TGLoadConversationAndHistoryForSearchActor.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGTelegramNetworking.h"
 #import <MTProtoKit/MTRequest.h>
@@ -13,11 +15,7 @@
 #import "TGMessage+Telegraph.h"
 #import "TGUserDataRequestBuilder.h"
 
-#import "TGStringUtils.h"
-
 #import "TGChannelManagementSignals.h"
-
-#import "TGPeerIdAdapter.h"
 
 #import "TGDownloadMessagesSignal.h"
 
@@ -107,7 +105,7 @@
             removedUnimportantHoles = dict[@"hole"] == nil ? nil : @[dict[@"hole"]];
             
             return [[TGDatabaseInstance() modify:^id {
-                [TGDatabaseInstance() addMessagesToChannel:peerId messages:dict[@"messages"] deleteMessages:nil unimportantGroups:dict[@"unimportantGroups"] addedHoles:nil removedHoles:removedImportantHoles removedUnimportantHoles:removedUnimportantHoles updatedMessageSortKeys:nil returnGroups:false keepUnreadCounters:false changedMessages:nil];
+                [TGDatabaseInstance() addMessagesToChannel:peerId messages:dict[@"messages"] deleteMessages:nil unimportantGroups:dict[@"unimportantGroups"] addedHoles:nil removedHoles:removedImportantHoles removedUnimportantHoles:removedUnimportantHoles updatedMessageSortKeys:nil returnGroups:false keepUnreadCounters:false skipFeedUpdate:true changedMessages:nil];
                 
                 return [SSignal complete];
             }] switchToLatest];

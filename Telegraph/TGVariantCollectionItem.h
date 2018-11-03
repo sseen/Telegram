@@ -11,6 +11,7 @@
 @interface TGVariantCollectionItem : TGCollectionItem
 
 @property (nonatomic, strong) NSString *title;
+@property (nonatomic, strong) UIColor *titleColor;
 @property (nonatomic, strong) NSString *variant;
 @property (nonatomic, strong) UIImage *icon;
 @property (nonatomic, strong) UIImage *variantIcon;
@@ -18,7 +19,8 @@
 @property (nonatomic) bool enabled;
 @property (nonatomic) bool hideArrow;
 @property (nonatomic) CGFloat minLeftPadding;
-@property (nonatomic) UIColor *variantColor;
+@property (nonatomic) bool flexibleLayout;
+@property (nonatomic, strong) UIColor *variantColor;
 
 - (instancetype)initWithTitle:(NSString *)title action:(SEL)action;
 - (instancetype)initWithTitle:(NSString *)title variant:(NSString *)variant action:(SEL)action;

@@ -1,6 +1,6 @@
 #import "TGTimelineAssignProfilePhotoActor.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGUser+Telegraph.h"
 #import "TGTelegraph.h"
@@ -48,9 +48,9 @@
             selfUser.photoUrlSmall = extractFileUrl(concretePhoto.photo_small);
             selfUser.photoUrlMedium = nil;
             selfUser.photoUrlBig = extractFileUrl(concretePhoto.photo_big);
+            
+            [TGUserDataRequestBuilder executeUserObjectsUpdate:[NSArray arrayWithObject:selfUser]];
         }
-        
-        [TGUserDataRequestBuilder executeUserObjectsUpdate:[NSArray arrayWithObject:selfUser]];
     }
     
     [ActionStageInstance() actionCompleted:self.path result:nil];

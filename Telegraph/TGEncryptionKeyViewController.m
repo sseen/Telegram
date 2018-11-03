@@ -1,24 +1,17 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGEncryptionKeyViewController.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGInterfaceAssets.h"
-#import "TGFont.h"
 
 #import <MTProtoKit/MTEncryption.h>
-#import "TGImageUtils.h"
-#import "TGStringUtils.h"
-#import "TGTimerTarget.h"
+#import <LegacyComponents/TGTimerTarget.h>
 
 #import "TGDatabase.h"
 
-#import "TGMenuView.h"
+#import <LegacyComponents/TGMenuView.h>
+
+#import "TGPresentation.h"
 
 @interface TGEncryptionKeyViewController ()
 {
@@ -63,13 +56,13 @@
 {
     [super loadView];
     
-    self.view.backgroundColor = [UIColor whiteColor];
+    self.view.backgroundColor = self.presentation.pallete.backgroundColor;
     
     _keyImageView = [[UIImageView alloc] init];
     [self.view addSubview:_keyImageView];
     
     _fingerprintLabel = [[UILabel alloc] init];
-    _fingerprintLabel.textColor = [UIColor blackColor];
+    _fingerprintLabel.textColor = self.presentation.pallete.textColor;
     _fingerprintLabel.backgroundColor = [UIColor clearColor];
     NSString *fontName = @"CourierNew-Bold";
     if (iosMajorVersion() >= 7) {
@@ -94,7 +87,7 @@
 //    [_emojiLabel addGestureRecognizer:gestureRecognizer];
     
     _descriptionLabel = [[UILabel alloc] init];
-    _descriptionLabel.textColor = [UIColor blackColor];
+    _descriptionLabel.textColor = self.presentation.pallete.textColor;
     _descriptionLabel.backgroundColor = [UIColor clearColor];
     _descriptionLabel.font = [UIFont systemFontOfSize:14];
     _descriptionLabel.textAlignment = NSTextAlignmentCenter;
@@ -115,7 +108,7 @@
     {
         NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:_descriptionLabel.font, NSFontAttributeName, nil];
         NSDictionary *subAttrs = [NSDictionary dictionaryWithObjectsAndKeys:[UIFont boldSystemFontOfSize:_descriptionLabel.font.pointSize], NSFontAttributeName, nil];
-        NSDictionary *linkAtts = @{NSForegroundColorAttributeName: TGAccentColor()};
+        NSDictionary *linkAtts = @{NSForegroundColorAttributeName: self.presentation.pallete.accentColor};
         
         NSMutableAttributedString *attributedText = [[NSMutableAttributedString alloc] initWithString:baseText attributes:attrs];
         
@@ -154,7 +147,7 @@
                 style.lineBreakMode = NSLineBreakByWordWrapping;
                 style.alignment = NSTextAlignmentCenter;
                 
-                NSAttributedString *fingerprintString = [[NSAttributedString alloc] initWithString:text attributes:@{NSParagraphStyleAttributeName: style, NSFontAttributeName: _fingerprintLabel.font, NSForegroundColorAttributeName: UIColorRGB(0x222222)}];
+                NSAttributedString *fingerprintString = [[NSAttributedString alloc] initWithString:text attributes:@{NSParagraphStyleAttributeName: style, NSFontAttributeName: _fingerprintLabel.font, NSForegroundColorAttributeName: self.presentation.pallete.textColor}];
                 
                 _fingerprintLabel.attributedText = fingerprintString;
                 
@@ -236,6 +229,10 @@
             keyOffset += 12.0f;
             fingerpringOffset += -12.0f;
             topInset += 70.0f;
+        } else if ([TGViewController hasTallScreen]) {
+            keyOffset += 74.0f;
+            fingerpringOffset += 3.0f;
+            topInset += 116.0f;
         } else if ([TGViewController hasVeryLargeScreen]) {
             keyOffset += 60.0f;
             fingerpringOffset += 3.0f;
@@ -292,7 +289,9 @@
             _fingerprintLabel.hidden = true;
         }
         
-        _keyImageView.frame = CGRectMake(10, self.controllerInset.top + (size.height - self.controllerInset.top - 248.0f) / 2.0f, keySize, keySize);
+        UIEdgeInsets safeAreaInset = [self calculatedSafeAreaInset];
+        
+        _keyImageView.frame = CGRectMake(10 + safeAreaInset.left, self.controllerInset.top + (size.height - self.controllerInset.top - 248.0f) / 2.0f, keySize, keySize);
         
         CGSize labelSize = [_descriptionLabel sizeThatFits:CGSizeMake(200, 1000)];
         
@@ -366,36 +365,6 @@
 - (void)setupTooltip
 {
     return;
-//    if (UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation))
-//        return;
-//    
-//    NSInteger displayed = [[[NSUserDefaults standardUserDefaults] objectForKey:@"TG_displayedEmojifySecretChatTooltip_v1"] integerValue];
-//#if defined(INTERNAL_RELEASE)
-//    //displayed = false;
-//#endif
-//    if (displayed > 2)
-//        return;
-//    
-//    if (_tooltipContainerView != nil)
-//        return;
-//    
-//    _tooltipTimer = [TGTimerTarget scheduledMainThreadTimerWithTarget:self action:@selector(tooltipTimerTick) interval:3.5 repeat:false];
-//    
-//    _tooltipContainerView = [[TGMenuContainerView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.view.frame.size.width, self.view.frame.size.height)];
-//    [self.view addSubview:_tooltipContainerView];
-//    
-//    NSMutableArray *actions = [[NSMutableArray alloc] init];
-//    [actions addObject:[[NSDictionary alloc] initWithObjectsAndKeys:TGLocalized(@"EncryptionKey.TapToEmojify"), @"title", nil]];
-//    
-//    [_tooltipContainerView.menuView setButtonsAndActions:actions watcherHandle:self.actionHandle];
-//    [_tooltipContainerView.menuView sizeToFit];
-//    _tooltipContainerView.menuView.buttonHighlightDisabled = true;
-//    
-//    CGRect frame = _fingerprintLabel.frame;
-//    frame.origin.y += 10.0f;
-//    [_tooltipContainerView showMenuFromRect:frame animated:false];
-//    
-//    [[NSUserDefaults standardUserDefaults] setObject:@(displayed + 1) forKey:@"TG_displayedEmojifySecretChatTooltip_v1"];
 }
 
 - (void)tooltipTimerTick

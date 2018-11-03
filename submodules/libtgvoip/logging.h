@@ -13,12 +13,10 @@
 #include <TargetConditionals.h>
 #endif
 
-void tgvoip_log_file_printf(char level, const char* msg, ...);
-void tgvoip_log_file_write_header();
+#include <stdio.h>
 
-#if !defined(snprintf) && defined(_WIN32) && defined(__cplusplus_winrt)
-#define snprintf _snprintf
-#endif
+void tgvoip_log_file_printf(char level, const char* msg, ...);
+void tgvoip_log_file_write_header(FILE* file);
 
 #if defined(__ANDROID__)
 
@@ -70,6 +68,9 @@ void tgvoip_log_file_write_header();
 
 #endif
 
+#if !defined(snprintf) && defined(_WIN32) && defined(__cplusplus_winrt)
+#define snprintf _snprintf
+#endif
 
 #ifdef TGVOIP_LOG_VERBOSITY
 #if TGVOIP_LOG_VERBOSITY<5

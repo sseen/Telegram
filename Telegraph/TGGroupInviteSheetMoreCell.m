@@ -1,6 +1,8 @@
 #import "TGGroupInviteSheetMoreCell.h"
 
-#import "TGFont.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import "TGPresentation.h"
 
 @interface TGGroupInviteSheetMoreCell () {
     UIImageView *_circleView;
@@ -34,6 +36,13 @@
         [self.contentView addSubview:_countLabel];
     }
     return self;
+}
+
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    _presentation = presentation;
+    
+    _countLabel.textColor = presentation.pallete.accentContrastColor;
 }
 
 - (void)setCount:(NSUInteger)count {

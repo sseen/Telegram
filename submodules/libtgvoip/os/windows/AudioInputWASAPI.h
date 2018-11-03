@@ -57,7 +57,7 @@ public:
 
 private:
 	void ActuallySetCurrentDevice(std::string deviceID);
-	static DWORD StartThread(void* arg);
+	static DWORD WINAPI StartThread(void* arg);
 	void RunThread();
 	WAVEFORMATEX format;
 	bool isRecording;
@@ -77,6 +77,7 @@ private:
 	bool isDefaultDevice;
 	ULONG refCount;
 	std::string streamChangeToDevice;
+	bool started;
 
 #ifdef TGVOIP_WINDOWS_DESKTOP
 	STDMETHOD(OnDisplayNameChanged) (LPCWSTR /*NewDisplayName*/, LPCGUID /*EventContext*/) { return S_OK; };

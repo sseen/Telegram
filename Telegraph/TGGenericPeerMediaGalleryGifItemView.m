@@ -1,19 +1,21 @@
 #import "TGGenericPeerMediaGalleryGifItemView.h"
+
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGGenericPeerMediaGalleryGifItem.h"
 
 #import "TGTelegraph.h"
 
-#import "TGImageView.h"
+#import <LegacyComponents/TGImageView.h>
 #import "TGVTAcceleratedVideoView.h"
-#import "TGModernGalleryZoomableScrollView.h"
+#import <LegacyComponents/TGModernGalleryZoomableScrollView.h>
 
-#import "TGDocumentMediaAttachment.h"
 #import "TGPreparedLocalDocumentMessage.h"
 
 #import "TGGifGalleryAddAccessoryView.h"
 
 #import "TGRecentGifsSignal.h"
-#import "TGGifConverter.h"
+#import <LegacyComponents/TGGifConverter.h>
 
 @interface TGGenericPeerMediaGalleryGifItemView ()
 {
@@ -160,10 +162,10 @@
                                         return nil;
                                     }];
                                     return [dataSignal mapToSignal:^SSignal *(NSData *data) {
-                                        return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSString *tempPath) {
+                                        return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSDictionary *dict) {
                                             return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subsctiber) {
                                                 NSError *error = nil;
-                                                [[NSFileManager defaultManager] moveItemAtPath:tempPath toPath:videoPath error:&error];
+                                                [[NSFileManager defaultManager] moveItemAtPath:dict[@"path"] toPath:videoPath error:&error];
                                                 if (error != nil) {
                                                     [subsctiber putError:nil];
                                                 } else {

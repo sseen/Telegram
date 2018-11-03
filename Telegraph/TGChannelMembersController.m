@@ -1,9 +1,9 @@
 #import "TGChannelMembersController.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGTelegraph.h"
 
-#import "TGConversation.h"
-#import "TGUser.h"
 #import "TGDatabase.h"
 #import "TGTelegramNetworking.h"
 
@@ -14,9 +14,9 @@
 
 #import "TGChannelManagementSignals.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGBotUserInfoController.h"
 #import "TGTelegraphUserInfoController.h"
@@ -27,10 +27,7 @@
 
 #import "TGGroupInfoSelectContactController.h"
 
-#import "TGNavigationController.h"
-#import "TGNavigationBar.h"
-
-#import "TGAlertView.h"
+#import "TGCustomAlertView.h"
 
 #import "TGChannelModeratorController.h"
 
@@ -39,8 +36,7 @@
 #import "TGVariantCollectionItem.h"
 #import "TGHeaderCollectionItem.h"
 
-#import "TGActionSheet.h"
-#import "TGStringUtils.h"
+#import "TGCustomActionSheet.h"
 
 #import "TGChannelModeratorController.h"
 
@@ -50,26 +46,21 @@
 
 #import "TGInterfaceManager.h"
 
-#import "TGSearchBar.h"
-#import "TGSearchDisplayMixin.h"
-
-#import "TGUser.h"
+#import <LegacyComponents/TGSearchBar.h>
+#import <LegacyComponents/TGSearchDisplayMixin.h>
 
 #import "TGContactCell.h"
-#import "TGFont.h"
-
-#import "TGDateUtils.h"
 
 #import "TGChannelManagementSignals.h"
 #import "TGGlobalMessageSearchSignals.h"
 
 #import "TGTelegraph.h"
 
-#import "TGImageUtils.h"
-
 #import "TGCachedConversationData.h"
 
 #import "TGGroupInfoUserCell.h"
+
+#import "TGPresentation.h"
 
 @interface TGChannelMembersController () <ASWatcher, TGGroupInfoSelectContactControllerDelegate, UITableViewDelegate, UITableViewDataSource, TGSearchDisplayMixinDelegate, TGSearchBarDelegate> {
     TGConversation *_conversation;
@@ -130,12 +121,12 @@
         _searchDisposable = [[SMetaDisposable alloc] init];
         
         self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:TGLocalized(@"Common.Back") style:UIBarButtonItemStylePlain target:self action:@selector(backPressed)];
-        
+                
         _searchItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemSearch target:self action:@selector(searchPressed)];
         
         switch (mode) {
             case TGChannelMembersModeMembers:
-                self.title = TGLocalized(@"Channel.Members.Title");
+                self.title = conversation.isChannelGroup ? TGLocalized(@"Channel.Members.Title") : TGLocalized(@"Channel.Subscribers.Title");
                 break;
             case TGChannelMembersModeBannedAndRestricted:
                 self.title = TGLocalized(@"Channel.BlackList.Title");
@@ -171,9 +162,9 @@
             TGButtonCollectionItem *addMemberItem = [[TGButtonCollectionItem alloc] initWithTitle:TGLocalized(@"GroupInfo.AddParticipant") action:@selector(addBlacklistPressed)];
             _inviteControlSection = [[TGCollectionMenuSection alloc] initWithItems:@[addMemberItem]];
             addMemberItem.leftInset = 65.0f;
-            addMemberItem.icon = [UIImage imageNamed:@"ModernContactListAddMemberIcon.png"];
+            addMemberItem.icon = self.presentation.images.contactsInviteIcon;
             addMemberItem.iconOffset = CGPointMake(3.0f, 0.0f);
-            addMemberItem.titleColor = TGAccentColor();
+            addMemberItem.titleColor = self.presentation.pallete.collectionMenuAccentColor;
             [self.menuSections addSection:_inviteControlSection];
         }
         
@@ -192,9 +183,9 @@
         TGHeaderCollectionItem *adminsTitleItem = [[TGHeaderCollectionItem alloc] initWithTitle:_conversation.isChannelGroup ? TGLocalized(@"ChannelMembers.GroupAdminsTitle") : TGLocalized(@"ChannelMembers.ChannelAdminsTitle")];
         TGButtonCollectionItem *addModeratorItem = [[TGButtonCollectionItem alloc] initWithTitle:TGLocalized(@"Channel.Management.AddModerator") action:@selector(addModeratorPressed)];
         addModeratorItem.leftInset = 65.0f;
-        addModeratorItem.icon = [UIImage imageNamed:@"ModernContactListAddMemberIcon.png"];
+        addModeratorItem.icon = self.presentation.images.contactsInviteIcon;
         addModeratorItem.iconOffset = CGPointMake(3.0f, 0.0f);
-        addModeratorItem.titleColor = TGAccentColor();
+        addModeratorItem.titleColor = self.presentation.pallete.collectionMenuAccentColor;
         addModeratorItem.deselectAutomatically = true;
         TGCommentCollectionItem *commentItem = [[TGCommentCollectionItem alloc] initWithFormattedText:_conversation.isChannelGroup ? TGLocalized(@"Group.Management.AddModeratorHelp") : TGLocalized(@"Channel.Management.AddModeratorHelp")];
         
@@ -623,19 +614,23 @@
     _searchReferenceView.userInteractionEnabled = false;
     [self.view addSubview:_searchReferenceView];
     
-    _searchBarOverlay = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.navigationController.view.frame.size.width, 64)];
+    CGFloat safeAreaInset = !UIEdgeInsetsEqualToEdgeInsets(self.controllerSafeAreaInset, UIEdgeInsetsZero) ? self.controllerSafeAreaInset.top : 20.0f;
+    CGFloat searchBarHeight = safeAreaInset + 44.0f;
+    
+    _searchBarOverlay = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.navigationController.view.frame.size.width, searchBarHeight)];
     _searchBarOverlay.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    _searchBarOverlay.backgroundColor = UIColorRGB(0xf7f7f7);
+    _searchBarOverlay.backgroundColor = self.presentation.pallete.barBackgroundColor;
     _searchBarOverlay.userInteractionEnabled = false;
     
-    _searchBarWrapper = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.navigationController.view.frame.size.width, 64)];
+    _searchBarWrapper = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.navigationController.view.frame.size.width, searchBarHeight)];
     _searchBarWrapper.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    _searchBarWrapper.backgroundColor = [UIColor whiteColor];
+    _searchBarWrapper.backgroundColor = self.presentation.pallete.backgroundColor;
     [self.view addSubview:_searchBarWrapper];
     
     [_searchBarWrapper addSubview:_searchBarOverlay];
     
-    _searchBar = [[TGSearchBar alloc] initWithFrame:CGRectMake(0.0f, 20, _searchBarWrapper.frame.size.width, [TGSearchBar searchBarBaseHeight]) style:TGSearchBarStyleHeader];
+    _searchBar = [[TGSearchBar alloc] initWithFrame:CGRectMake(0.0f, safeAreaInset, _searchBarWrapper.frame.size.width, [TGSearchBar searchBarBaseHeight]) style:TGSearchBarStyleHeader];
+    [_searchBar setPallete:self.presentation.searchBarPallete];
     _searchBar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _searchBar.customBackgroundView.image = nil;
     _searchBar.customActiveBackgroundView.image = nil;
@@ -648,7 +643,7 @@
     [_searchBarWrapper addSubview:_searchBar];
     
     UIView *separatorView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, _searchBarWrapper.frame.size.height - TGScreenPixel, _searchBarWrapper.frame.size.width, TGScreenPixel)];
-    separatorView.backgroundColor = UIColorRGB(0xb2b2b2);
+    separatorView.backgroundColor = self.presentation.pallete.barSeparatorColor;
     separatorView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
     [_searchBarWrapper addSubview:separatorView];
     
@@ -715,11 +710,6 @@
                         }
                     }
                     
-                    /*if (exists && ![options[@"force"] boolValue]) {
-                        
-                        return;
-                    }*/
-                    
                     __weak TGChannelMembersController *weakSelf = self;
                     TGChannelModeratorController *controller = [[TGChannelModeratorController alloc] initWithConversation:self->_conversation user:user currentSignal:[SSignal single:_memberDatas[@(user.uid)]]];
                     controller.done = ^(TGChannelAdminRights *rights) {
@@ -740,9 +730,9 @@
                                         NSString *errorType = [[TGTelegramNetworking instance] extractNetworkErrorType:error];
                                         NSString *errorText = TGLocalized(@"Profile.CreateEncryptedChatError");
                                         if ([errorType isEqual:@"USER_BLOCKED"]) {
-                                            errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddBlocked") : TGLocalized(@"Channel.ErrorAddBlocked");
+                                            errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddBlocked") : TGLocalized(@"Group.ErrorAddBlocked");
                                         } else if ([errorType isEqual:@"USERS_TOO_MUCH"]) {
-                                            errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddTooMuch") : TGLocalized(@"Channel.ErrorAddTooMuch");
+                                            errorText = conversation.isChannelGroup ? TGLocalized(@"ConversationProfile.UsersTooMuchError") : TGLocalized(@"Channel.ErrorAddTooMuch");
                                         } else if ([errorType isEqual:@"USER_NOT_MUTUAL_CONTACT"]) {
                                             errorText = TGLocalized(@"Group.ErrorNotMutualContact");
                                         } else if ([errorType isEqual:@"ADMINS_TOO_MUCH"]) {
@@ -750,8 +740,11 @@
                                         } else if ([errorType isEqual:@"USER_PRIVACY_RESTRICTED"]) {
                                             NSString *format = conversation.isChannelGroup ? TGLocalized(@"Privacy.GroupsAndChannels.InviteToGroupError") : TGLocalized(@"Privacy.GroupsAndChannels.InviteToChannelError");
                                             errorText = [[NSString alloc] initWithFormat:format, user.displayFirstName, user.displayFirstName];
+                                        } else if ([errorType isEqual:@"CHANNEL_ADMIN_INVITE_REQUIRED"]) {
+                                            errorText = TGLocalized(@"Channel.Members.AddAdminErrorBlacklisted");
                                         }
-                                        [[[TGAlertView alloc] initWithTitle:nil message:errorText cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil] show];
+                                        
+                                        [TGCustomAlertView presentAlertWithTitle:nil message:errorText cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
                                     }
                                 } completed:^{
                                     __strong TGChannelMembersController *strongSelf = weakSelf;
@@ -824,108 +817,198 @@
                     break;
                 }
                 case TGChannelMembersModeBannedAndRestricted: {
-                    TGCachedUserData *memberData = _memberDatas[@(user.uid)];
-                    
-                    TGChannelBanController *controller = [[TGChannelBanController alloc] initWithConversation:_conversation user:user current:_memberDatas[@(user.uid)] member:memberData != nil ? [SSignal single:memberData] : [TGChannelManagementSignals channelRole:_conversation.conversationId accessHash:_conversation.accessHash user:user]];
-                    
-                    __weak TGChannelMembersController *weakSelf = self;
-                    controller.done = ^(TGChannelBannedRights *rights) {
-                        __strong TGChannelMembersController *strongSelf = weakSelf;
-                        if (strongSelf != nil) {
-                            if (rights != nil) {
-                                TGProgressWindow *progressWindow = [[TGProgressWindow alloc] init];
-                                [progressWindow show:true];
-                                [[[[TGChannelManagementSignals updateChannelBannedRightsAndGetMembership:strongSelf->_conversation.conversationId accessHash:strongSelf->_conversation.accessHash user:[TGDatabaseInstance() loadUser:uid] rights:rights] onDispose:^{
-                                    TGDispatchOnMainThread(^{
-                                        [progressWindow dismiss:true];
-                                    });
-                                }] deliverOn:[SQueue mainQueue]] startWithNext:^(TGCachedConversationMember *updatedMember) {
-                                    __strong TGChannelMembersController *strongSelf = weakSelf;
-                                    if (strongSelf != nil) {
-                                        [TGDatabaseInstance() updateChannelCachedData:strongSelf->_conversation.conversationId block:^TGCachedConversationData *(TGCachedConversationData *data) {
-                                            if (data == nil) {
-                                                data = [[TGCachedConversationData alloc] init];
-                                            }
-                                            
-                                            return [data updateMemberBannedRights:user.uid rights:rights timestamp:(int32_t)[[TGTelegramNetworking instance] approximateRemoteTime] isMember:updatedMember != nil kickedById:TGTelegraphInstance.clientUserId];
-                                        }];
-                                        
-                                        if (rights.numberOfRestrictions == 0) {
-                                            NSMutableArray *updatedUsers = [[NSMutableArray alloc] initWithArray:strongSelf->_users];
-                                            NSMutableDictionary *updatedMemberDatas = [[NSMutableDictionary alloc] initWithDictionary:strongSelf->_memberDatas];
-                                            TGCachedConversationMember *member = updatedMemberDatas[@(user.uid)];
-                                            if (updatedMember != nil) {
-                                                member = updatedMember;
-                                            } else {
-                                                member = [member withUpdatedBannedRights:nil];
-                                            }
-                                            if (member != nil) {
-                                                updatedMemberDatas[@(user.uid)] = member;
-                                            }
-                                            NSUInteger index = 0;
-                                            for (TGUser *current in updatedUsers) {
-                                                if (current.uid == user.uid) {
-                                                    [updatedUsers removeObjectAtIndex:index];
-                                                    [updatedMemberDatas removeObjectForKey:@(current.uid)];
-                                                    
-                                                    [strongSelf removeParticipantFromList:current.uid];
-                                                    
-                                                    [strongSelf setUsers:updatedUsers memberDatas:updatedMemberDatas isFinal:true];
-                                                    
-                                                    break;
+                    if (_conversation.isChannelGroup) {
+                        TGCachedUserData *memberData = _memberDatas[@(user.uid)];
+                        
+                        TGChannelBanController *controller = [[TGChannelBanController alloc] initWithConversation:_conversation user:user current:_memberDatas[@(user.uid)] member:memberData != nil ? [SSignal single:memberData] : [TGChannelManagementSignals channelRole:_conversation.conversationId accessHash:_conversation.accessHash user:user]];
+                        
+                        __weak TGChannelMembersController *weakSelf = self;
+                        controller.done = ^(TGChannelBannedRights *rights) {
+                            __strong TGChannelMembersController *strongSelf = weakSelf;
+                            if (strongSelf != nil) {
+                                if (rights != nil) {
+                                    TGProgressWindow *progressWindow = [[TGProgressWindow alloc] init];
+                                    [progressWindow show:true];
+                                    [[[[TGChannelManagementSignals updateChannelBannedRightsAndGetMembership:strongSelf->_conversation.conversationId accessHash:strongSelf->_conversation.accessHash user:[TGDatabaseInstance() loadUser:uid] rights:rights] onDispose:^{
+                                        TGDispatchOnMainThread(^{
+                                            [progressWindow dismiss:true];
+                                        });
+                                    }] deliverOn:[SQueue mainQueue]] startWithNext:^(TGCachedConversationMember *updatedMember) {
+                                        __strong TGChannelMembersController *strongSelf = weakSelf;
+                                        if (strongSelf != nil) {
+                                            [TGDatabaseInstance() updateChannelCachedData:strongSelf->_conversation.conversationId block:^TGCachedConversationData *(TGCachedConversationData *data) {
+                                                if (data == nil) {
+                                                    data = [[TGCachedConversationData alloc] init];
                                                 }
-                                                index++;
-                                            }
-                                        } else {
-                                            NSMutableArray *updatedUsers = [[NSMutableArray alloc] initWithArray:strongSelf->_users];
-                                            NSMutableDictionary *updatedMemberDatas = [[NSMutableDictionary alloc] initWithDictionary:strongSelf->_memberDatas];
-                                            TGCachedConversationMember *member = updatedMemberDatas[@(user.uid)];
-                                            if (updatedMember != nil) {
-                                                member = updatedMember;
-                                            } else {
-                                                member = [member withUpdatedBannedRights:rights];
-                                            }
-                                            if (member != nil) {
-                                                updatedMemberDatas[@(user.uid)] = member;
-                                            }
-                                            bool found = false;
-                                            for (TGUser *current in updatedUsers) {
-                                                if (current.uid == user.uid) {
-                                                    found = true;
-                                                    break;
+                                                
+                                                return [data updateMemberBannedRights:user.uid rights:rights timestamp:(int32_t)[[TGTelegramNetworking instance] approximateRemoteTime] isMember:updatedMember != nil kickedById:TGTelegraphInstance.clientUserId];
+                                            }];
+                                            
+                                            if (rights.numberOfRestrictions == 0) {
+                                                NSMutableArray *updatedUsers = [[NSMutableArray alloc] initWithArray:strongSelf->_users];
+                                                NSMutableDictionary *updatedMemberDatas = [[NSMutableDictionary alloc] initWithDictionary:strongSelf->_memberDatas];
+                                                TGCachedConversationMember *member = updatedMemberDatas[@(user.uid)];
+                                                if (updatedMember != nil) {
+                                                    member = updatedMember;
+                                                } else {
+                                                    member = [member withUpdatedBannedRights:nil];
                                                 }
-                                            }
-                                            if (!found) {
-                                                [updatedUsers addObject:user];
+                                                if (member != nil) {
+                                                    updatedMemberDatas[@(user.uid)] = member;
+                                                }
+                                                NSUInteger index = 0;
+                                                for (TGUser *current in updatedUsers) {
+                                                    if (current.uid == user.uid) {
+                                                        [updatedUsers removeObjectAtIndex:index];
+                                                        [updatedMemberDatas removeObjectForKey:@(current.uid)];
+                                                        
+                                                        [strongSelf removeParticipantFromList:current.uid];
+                                                        
+                                                        [strongSelf setUsers:updatedUsers memberDatas:updatedMemberDatas isFinal:true];
+                                                        
+                                                        break;
+                                                    }
+                                                    index++;
+                                                }
+                                            } else {
+                                                NSMutableArray *updatedUsers = [[NSMutableArray alloc] initWithArray:strongSelf->_users];
+                                                NSMutableDictionary *updatedMemberDatas = [[NSMutableDictionary alloc] initWithDictionary:strongSelf->_memberDatas];
+                                                TGCachedConversationMember *member = updatedMemberDatas[@(user.uid)];
+                                                if (updatedMember != nil) {
+                                                    member = updatedMember;
+                                                } else {
+                                                    member = [member withUpdatedBannedRights:rights];
+                                                }
+                                                if (member != nil) {
+                                                    updatedMemberDatas[@(user.uid)] = member;
+                                                }
+                                                bool found = false;
+                                                for (TGUser *current in updatedUsers) {
+                                                    if (current.uid == user.uid) {
+                                                        found = true;
+                                                        break;
+                                                    }
+                                                }
+                                                if (!found) {
+                                                    [updatedUsers addObject:user];
+                                                }
+                                                
+                                                [strongSelf setUsers:updatedUsers memberDatas:updatedMemberDatas isFinal:true];
+                                                
+                                                [strongSelf updateEditing];
                                             }
                                             
-                                            [strongSelf setUsers:updatedUsers memberDatas:updatedMemberDatas isFinal:true];
-                                            
-                                            [strongSelf updateEditing];
+                                            [strongSelf dismissViewControllerAnimated:true completion:nil];
+                                        }
+                                        [progressWindow dismissWithSuccess];
+                                    } error:^(__unused id error) {
+                                        __strong TGChannelMembersController *strongSelf = weakSelf;
+                                        if (strongSelf != nil) {
+                                        }
+                                    } completed:^{
+                                    }];
+                                } else {
+                                    [strongSelf dismissViewControllerAnimated:true completion:nil];
+                                }
+                            }
+                        };
+                        
+                        TGNavigationController *navigationController = [TGNavigationController navigationControllerWithControllers:@[controller] navigationBarClass:[TGWhiteNavigationBar class]];
+                        if ([self inPopover]) {
+                            navigationController.modalPresentationStyle = UIModalPresentationCurrentContext;
+                            navigationController.presentationStyle = TGNavigationControllerPresentationStyleChildInPopover;
+                        }
+                        
+                        [self presentViewController:navigationController animated:true completion:nil];
+                    } else {
+                        TGCachedUserData *memberData = _memberDatas[@(user.uid)];
+                        if (memberData == nil) {
+                            __weak TGChannelMembersController *weakSelf = self;
+                            TGChannelBannedRights *rights = [[TGChannelBannedRights alloc] initWithBanReadMessages:true banSendMessages:true banSendMedia:true banSendStickers:true banSendGifs:true banSendGames:true banSendInline:true banEmbedLinks:true timeout:INT32_MAX];
+                            TGProgressWindow *progressWindow = [[TGProgressWindow alloc] init];
+                            [progressWindow show:true];
+                            [[[[TGChannelManagementSignals updateChannelBannedRightsAndGetMembership:self->_conversation.conversationId accessHash:self->_conversation.accessHash user:[TGDatabaseInstance() loadUser:uid] rights:rights] onDispose:^{
+                                TGDispatchOnMainThread(^{
+                                    [progressWindow dismiss:true];
+                                });
+                            }] deliverOn:[SQueue mainQueue]] startWithNext:^(TGCachedConversationMember *updatedMember) {
+                                __strong TGChannelMembersController *strongSelf = weakSelf;
+                                if (strongSelf != nil) {
+                                    [TGDatabaseInstance() updateChannelCachedData:strongSelf->_conversation.conversationId block:^TGCachedConversationData *(TGCachedConversationData *data) {
+                                        if (data == nil) {
+                                            data = [[TGCachedConversationData alloc] init];
                                         }
                                         
-                                        [strongSelf dismissViewControllerAnimated:true completion:nil];
+                                        return [data updateMemberBannedRights:user.uid rights:rights timestamp:(int32_t)[[TGTelegramNetworking instance] approximateRemoteTime] isMember:updatedMember != nil kickedById:TGTelegraphInstance.clientUserId];
+                                    }];
+                                    
+                                    if (rights.numberOfRestrictions == 0) {
+                                        NSMutableArray *updatedUsers = [[NSMutableArray alloc] initWithArray:strongSelf->_users];
+                                        NSMutableDictionary *updatedMemberDatas = [[NSMutableDictionary alloc] initWithDictionary:strongSelf->_memberDatas];
+                                        TGCachedConversationMember *member = updatedMemberDatas[@(user.uid)];
+                                        if (updatedMember != nil) {
+                                            member = updatedMember;
+                                        } else {
+                                            member = [member withUpdatedBannedRights:nil];
+                                        }
+                                        if (member != nil) {
+                                            updatedMemberDatas[@(user.uid)] = member;
+                                        }
+                                        NSUInteger index = 0;
+                                        for (TGUser *current in updatedUsers) {
+                                            if (current.uid == user.uid) {
+                                                [updatedUsers removeObjectAtIndex:index];
+                                                [updatedMemberDatas removeObjectForKey:@(current.uid)];
+                                                
+                                                [strongSelf removeParticipantFromList:current.uid];
+                                                
+                                                [strongSelf setUsers:updatedUsers memberDatas:updatedMemberDatas isFinal:true];
+                                                
+                                                break;
+                                            }
+                                            index++;
+                                        }
+                                    } else {
+                                        NSMutableArray *updatedUsers = [[NSMutableArray alloc] initWithArray:strongSelf->_users];
+                                        NSMutableDictionary *updatedMemberDatas = [[NSMutableDictionary alloc] initWithDictionary:strongSelf->_memberDatas];
+                                        TGCachedConversationMember *member = updatedMemberDatas[@(user.uid)];
+                                        if (updatedMember != nil) {
+                                            member = updatedMember;
+                                        } else {
+                                            member = [member withUpdatedBannedRights:rights];
+                                        }
+                                        if (member != nil) {
+                                            updatedMemberDatas[@(user.uid)] = member;
+                                        }
+                                        bool found = false;
+                                        for (TGUser *current in updatedUsers) {
+                                            if (current.uid == user.uid) {
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                        if (!found) {
+                                            [updatedUsers addObject:user];
+                                        }
+                                        
+                                        [strongSelf setUsers:updatedUsers memberDatas:updatedMemberDatas isFinal:true];
+                                        
+                                        [strongSelf updateEditing];
                                     }
-                                    [progressWindow dismissWithSuccess];
-                                } error:^(__unused id error) {
-                                    __strong TGChannelMembersController *strongSelf = weakSelf;
-                                    if (strongSelf != nil) {
-                                    }
-                                } completed:^{
-                                }];
-                            } else {
-                                [strongSelf dismissViewControllerAnimated:true completion:nil];
-                            }
+                                    
+                                    [strongSelf dismissViewControllerAnimated:true completion:nil];
+                                }
+                                [progressWindow dismissWithSuccess];
+                            } error:^(__unused id error) {
+                                __strong TGChannelMembersController *strongSelf = weakSelf;
+                                if (strongSelf != nil) {
+                                }
+                            } completed:^{
+                            }];
+                        } else {
+                            [[TGInterfaceManager instance] navigateToProfileOfUser:uid];
                         }
-                    };
-                    
-                    TGNavigationController *navigationController = [TGNavigationController navigationControllerWithControllers:@[controller] navigationBarClass:[TGWhiteNavigationBar class]];
-                    if ([self inPopover]) {
-                        navigationController.modalPresentationStyle = UIModalPresentationCurrentContext;
-                        navigationController.presentationStyle = TGNavigationControllerPresentationStyleChildInPopover;
                     }
-                    
-                    [self presentViewController:navigationController animated:true completion:nil];
                     
                     break;
                 }
@@ -1093,12 +1176,12 @@
                         case TGChannelMembersModeAdmins: {
                             if (member == nil) {
                                 if (strongSelf->_conversation.channelRole != TGChannelRoleCreator && !strongSelf->_conversation.everybodyCanAddMembers && !strongSelf->_conversation.channelAdminRights.canInviteUsers) {
-                                    [TGAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Members.AddAdminErrorNotAMember") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
+                                    [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Members.AddAdminErrorNotAMember") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
                                     return;
                                 }
-                            } else if (member.bannedRights.tlRights.flags != 0) {
+                            } else if (member.bannedRights.tlFlags != 0) {
                                 if (strongSelf->_conversation.channelRole != TGChannelRoleCreator && !strongSelf->_conversation.channelAdminRights.canBanUsers) {
-                                    [TGAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Members.AddAdminErrorBlacklisted") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
+                                    [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Members.AddAdminErrorBlacklisted") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
                                     
                                     return;
                                 }
@@ -1117,6 +1200,7 @@
                 }
             }
         }];
+        searchController.presentation = self.presentation;
         
         TGNavigationController *navigationController = [TGNavigationController navigationControllerWithControllers:@[searchController] navigationBarClass:[TGWhiteNavigationBar class]];
         if ([self inPopover]) {
@@ -1134,7 +1218,7 @@
     TGGroupInfoSelectContactController *selectContactController = [[TGGroupInfoSelectContactController alloc] initWithContactsMode:contactsMode];
     selectContactController.deselectAutomatically = true;
     selectContactController.delegate = self;
-    
+    selectContactController.presentation = self.presentation;
     NSMutableArray *disabledUsers = [[NSMutableArray alloc] init];
     
     NSMutableArray *userIds = [[NSMutableArray alloc] init];
@@ -1179,9 +1263,9 @@
                                 NSString *errorType = [[TGTelegramNetworking instance] extractNetworkErrorType:error];
                                 NSString *errorText = TGLocalized(@"Profile.CreateEncryptedChatError");
                                 if ([errorType isEqual:@"USER_BLOCKED"]) {
-                                    errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddBlocked") : TGLocalized(@"Channel.ErrorAddBlocked");
+                                    errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddBlocked") : TGLocalized(@"Group.ErrorAddBlocked");
                                 } else if ([errorType isEqual:@"USERS_TOO_MUCH"]) {
-                                    errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddTooMuch") : TGLocalized(@"Channel.ErrorAddTooMuch");
+                                    errorText = conversation.isChannelGroup ? TGLocalized(@"ConversationProfile.UsersTooMuchError") : TGLocalized(@"Channel.ErrorAddTooMuch");
                                 } else if ([errorType isEqual:@"USER_NOT_MUTUAL_CONTACT"]) {
                                     errorText = TGLocalized(@"Group.ErrorNotMutualContact");
                                 } else if ([errorType isEqual:@"ADMINS_TOO_MUCH"]) {
@@ -1190,7 +1274,7 @@
                                     NSString *format = conversation.isChannelGroup ? TGLocalized(@"Privacy.GroupsAndChannels.InviteToGroupError") : TGLocalized(@"Privacy.GroupsAndChannels.InviteToChannelError");
                                     errorText = [[NSString alloc] initWithFormat:format, user.displayFirstName, user.displayFirstName];
                                 }
-                                [[[TGAlertView alloc] initWithTitle:nil message:errorText cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil] show];
+                                [TGCustomAlertView presentAlertWithTitle:nil message:errorText cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
                             }
                         } completed:^{
                             __strong TGChannelMembersController *strongSelf = weakSelf;
@@ -1256,35 +1340,6 @@
     }] startOn:[SQueue mainQueue]];
 }
 
-- (SSignal *)addManagementMember:(TGUser *)user {
-    if (user.kind == TGUserKindGeneric) {
-        bool isGroup = _conversation.isChannelGroup;
-        __weak TGChannelMembersController *weakSelf = self;
-        return [[self memberRole:user] mapToSignal:^SSignal *(TGCachedConversationMember *member) {
-            __strong TGChannelMembersController *strongSelf = weakSelf;
-            if (strongSelf != nil) {
-                if (member == nil) {
-                    SPipe *pipe = [[SPipe alloc] init];
-                    [[[TGAlertView alloc] initWithTitle:nil message:[[NSString alloc] initWithFormat:isGroup ? TGLocalized(@"Group.Management.ErrorNotMember") : TGLocalized(@"Channel.Management.ErrorNotMember"), user.displayFirstName] cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:TGLocalized(@"Common.OK") completionBlock:^(bool okButtonPressed) {
-                        if (okButtonPressed) {
-                            pipe.sink([[strongSelf addMember:user] then:[strongSelf modifyMemberRole:user add:true]]);
-                        } else {
-                            pipe.sink([SSignal fail:nil]);
-                        }
-                    }] show];
-                    return [[pipe.signalProducer() take:1] switchToLatest];
-                } else {
-                    return [strongSelf modifyMemberRole:user add:true];
-                }
-            } else {
-                return [SSignal fail:nil];
-            }
-        }];
-    } else {
-        return [self modifyMemberRole:user add:true];
-    }
-}
-
 - (SSignal *)addMember:(TGUser *)user {
     __weak TGChannelMembersController *weakSelf = self;
     TGConversation *conversation = _conversation;
@@ -1303,9 +1358,9 @@
                 NSString *errorType = [[TGTelegramNetworking instance] extractNetworkErrorType:error];
                 NSString *errorText = TGLocalized(@"Profile.CreateEncryptedChatError");
                 if ([errorType isEqual:@"USER_BLOCKED"]) {
-                    errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddBlocked") : TGLocalized(@"Channel.ErrorAddBlocked");
+                    errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddBlocked") : TGLocalized(@"Group.ErrorAddBlocked");
                 } else if ([errorType isEqual:@"USERS_TOO_MUCH"]) {
-                    errorText = conversation.isChannelGroup ? TGLocalized(@"Group.ErrorAddTooMuch") : TGLocalized(@"Channel.ErrorAddTooMuch");
+                    errorText = conversation.isChannelGroup ? TGLocalized(@"ConversationProfile.UsersTooMuchError") : TGLocalized(@"Channel.ErrorAddTooMuch");
                 } else if ([errorType isEqual:@"USER_NOT_MUTUAL_CONTACT"]) {
                     errorText = TGLocalized(@"Group.ErrorNotMutualContact");
                 } else if ([errorType isEqual:@"ADMINS_TOO_MUCH"]) {
@@ -1314,7 +1369,7 @@
                     NSString *format = conversation.isChannelGroup ? TGLocalized(@"Privacy.GroupsAndChannels.InviteToGroupError") : TGLocalized(@"Privacy.GroupsAndChannels.InviteToChannelError");
                     errorText = [[NSString alloc] initWithFormat:format, user.displayFirstName, user.displayFirstName];
                 }
-                [[[TGAlertView alloc] initWithTitle:nil message:errorText cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil] show];
+                [TGCustomAlertView presentAlertWithTitle:nil message:errorText cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
             });
         }];
         
@@ -1344,28 +1399,9 @@
     }] startOn:[SQueue mainQueue]];
 }
 
-- (void)selectContactControllerDidSelectUser:(TGUser *)user {
-    if (user == nil) {
-        [self dismissViewControllerAnimated:true completion:nil];
-        return;
-    }
-    
-    __weak TGChannelMembersController *weakSelf = self;
-    if (_conversation.username.length == 0 || true) {
-        [self dismissViewControllerAnimated:true completion:nil];
-        [[self addManagementMember:user] startWithNext:nil completed:^{
-            /*__strong TGChannelMembersController *strongSelf = weakSelf;
-            if (strongSelf != nil) {
-                [strongSelf dismissViewControllerAnimated:true completion:nil];
-            }*/
-        }];
-    } else {
-    }
-}
-
 - (void)whoCanAddMembersPressed {
     __weak TGChannelMembersController *weakSelf = self;
-    [[[TGActionSheet alloc] initWithTitle:nil actions:@[
+    [[[TGCustomActionSheet alloc] initWithTitle:nil actions:@[
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"ChannelMembers.WhoCanAddMembers.AllMembers") action:@"all"],
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"ChannelMembers.WhoCanAddMembers.Admins") action:@"admins"],
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Common.Cancel") action:@"cancel" type:TGActionSheetActionTypeCancel]
@@ -1415,7 +1451,7 @@
                     case TGChannelMembersModeBannedAndRestricted: {
                         if (member.isCreator || member.adminRights.hasAnyRights) {
                             if (strongSelf->_conversation.channelRole != TGChannelRoleCreator && !member.adminCanManage) {
-                                [TGAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Members.AddBannedErrorAdmin") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
+                                [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Members.AddBannedErrorAdmin") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
                                 
                                 return;
                             }
@@ -1432,6 +1468,7 @@
                 }
             }
         }];
+        searchController.presentation = self.presentation;
         
         TGNavigationController *navigationController = [TGNavigationController navigationControllerWithControllers:@[searchController] navigationBarClass:[TGWhiteNavigationBar class]];
         if ([self inPopover]) {
@@ -1504,16 +1541,12 @@
                 if (_conversation.isChannelGroup) {
                     filtered = [[TGChannelAdminRights alloc] initWithCanChangeInfo:member.adminRights.canChangeInfo canPostMessages:false canEditMessages:member.adminRights.canEditMessages canDeleteMessages:member.adminRights.canDeleteMessages canBanUsers:member.adminRights.canBanUsers canInviteUsers:member.adminRights.canInviteUsers canChangeInviteLink:member.adminRights.canChangeInviteLink canPinMessages:member.adminRights.canPinMessages canAddAdmins:member.adminRights.canAddAdmins];
                 } else {
-                    filtered = [[TGChannelAdminRights alloc] initWithCanChangeInfo:member.adminRights.canChangeInfo canPostMessages:member.adminRights.canPostMessages canEditMessages:member.adminRights.canEditMessages canDeleteMessages:member.adminRights.canDeleteMessages canBanUsers:false canInviteUsers:false canChangeInviteLink:false canPinMessages:false canAddAdmins:member.adminRights.canAddAdmins];
+                    filtered = [[TGChannelAdminRights alloc] initWithCanChangeInfo:member.adminRights.canChangeInfo canPostMessages:member.adminRights.canPostMessages canEditMessages:member.adminRights.canEditMessages canDeleteMessages:member.adminRights.canDeleteMessages canBanUsers:false canInviteUsers:false canChangeInviteLink:false canPinMessages:member.adminRights.canPinMessages canAddAdmins:member.adminRights.canAddAdmins];
                 }
                 
                 TGUser *inviter = [TGDatabaseInstance() loadUser:member.adminInviterId];
-                if (member.adminInviterId != 0 && inviter != nil) {
-                    [userItem setCustomStatus:[NSString stringWithFormat:TGLocalized(@"Channel.Management.PromotedBy"), inviter.displayName]];
-                } else {
-                    NSString *format = [TGStringUtils integerValueFormat:@"Channel.Management.LabelRights_" value:member.adminRights.numberOfRights];
-                    [userItem setCustomStatus:[NSString stringWithFormat:TGLocalized(format), [NSString stringWithFormat:@"%d", filtered.numberOfRights]]];
-                }
+                [userItem setCustomStatus:[NSString stringWithFormat:TGLocalized(@"Channel.Management.PromotedBy"), inviter.displayName]];
+                
             }
         } else if (_mode == TGChannelMembersModeBannedAndRestricted) {
             TGUser *inviter = [TGDatabaseInstance() loadUser:member.kickedById];
@@ -1523,20 +1556,6 @@
         }
     }
     NSString *optionTitle = nil;
-    switch (_mode) {
-        case TGChannelMembersModeMembers: {
-            optionTitle = TGLocalized(@"Channel.Members.Kick");
-            break;
-        }
-        case TGChannelMembersModeBannedAndRestricted: {
-            optionTitle = TGLocalized(@"Channel.Management.Remove");
-            break;
-        }
-        case TGChannelMembersModeAdmins: {
-            optionTitle = TGLocalized(@"Channel.Management.Remove");
-            break;
-        }
-    }
     userItem.optionTitle = optionTitle;
     return userItem;
 }
@@ -1552,8 +1571,11 @@
         [_searchMixin controllerInsetUpdated:inset];
         
         CGRect frame = _searchBarWrapper.frame;
+        CGFloat headerInset = !UIEdgeInsetsEqualToEdgeInsets(self.controllerSafeAreaInset, UIEdgeInsetsZero) ? self.controllerSafeAreaInset.top : 20.0f;
+        frame.size.height = 44 + headerInset;
+        
         if (!_searchMixin.isActive) {
-            frame.origin.y = self.controllerInset.top - 64.0f;
+            frame.origin.y = -frame.size.height; //self.controllerInset.top - 64.0f;
         } else {
             frame.origin.y = 0.0f;
             if (self.navigationController.modalPresentationStyle == UIModalPresentationFormSheet) {
@@ -1561,6 +1583,9 @@
             }
         }
         _searchBarWrapper.frame = frame;
+        frame = _searchBar.frame;
+        _searchBar.frame = CGRectMake(0.0f, headerInset, _searchBarWrapper.frame.size.width, _searchBar.frame.size.height);
+        _searchBar.safeAreaInset = self.controllerSafeAreaInset;
     }
 }
 
@@ -1574,10 +1599,12 @@
 {
     void (^changeBlock)(void) = ^
     {
+        CGFloat inset = !UIEdgeInsetsEqualToEdgeInsets(self.controllerSafeAreaInset, UIEdgeInsetsZero) ? self.controllerSafeAreaInset.top : 20.0f;
         CGRect frame = _searchBarWrapper.frame;
+        frame.size.height = 44 + inset;
         if (hidden)
         {
-            frame.origin.y = self.controllerInset.top - 64.0f;
+            frame.origin.y = -frame.size.height;
         }
         else
         {
@@ -1734,11 +1761,10 @@
     static NSString *cellIdentifier = @"TGGroupInfoUserCell";
     TGGroupInfoUserCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
     if (cell == nil)
-    {
         cell = [[TGGroupInfoUserCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellIdentifier];
-    }
-    
+    cell.presentation = self.presentation;
     TGGroupInfoUserCollectionItem *item = [self makeItem:user member:_searchResultsMemberDatas[@(user.uid)]];
+    item.presentation = self.presentation;
     [cell setItem:item];
     
     return cell;
@@ -1755,7 +1781,8 @@
 - (UITableView *)createTableViewForSearchMixin:(TGSearchDisplayMixin *)__unused searchMixin {
     UITableView *tableView = [[UITableView alloc] init];
     
-    tableView.backgroundColor = [UIColor whiteColor];
+    tableView.backgroundColor = self.presentation.pallete.backgroundColor;
+    tableView.separatorColor = self.presentation.pallete.separatorColor;
     tableView.dataSource = self;
     tableView.delegate = self;
     

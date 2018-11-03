@@ -1,20 +1,19 @@
 #import "TGNetworkUsageController.h"
 
-#import "TGFont.h"
-#import "TGImageUtils.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGHeaderCollectionItem.h"
 #import "TGVariantCollectionItem.h"
 #import "TGButtonCollectionItem.h"
 #import "TGCommentCollectionItem.h"
 
-#import <MTProtoKit/MtProtoKit.h>
+#import <MTProtoKit/MTProtoKit.h>
 
 #import "TGTelegramNetworking.h"
-#import "TGStringUtils.h"
-#import "TGDateUtils.h"
 
-#import "TGActionSheet.h"
+#import "TGCustomActionSheet.h"
+
+#import "TGPresentation.h"
 
 static SSignal *statsSignal(MTNetworkUsageCalculationInfo *baseInfo) {
     return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subscriber) {
@@ -118,15 +117,14 @@ static SSignal *statsSignal(MTNetworkUsageCalculationInfo *baseInfo) {
         
         _segmentedControl = [[UISegmentedControl alloc] initWithItems:@[TGLocalized(@"NetworkUsageSettings.Cellular"), TGLocalized(@"NetworkUsageSettings.Wifi")]];
         
-        /*[_segmentedControl setBackgroundImage:[UIImage imageNamed:@"ModernSegmentedControlBackground.png"] forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
-        [_segmentedControl setBackgroundImage:[UIImage imageNamed:@"ModernSegmentedControlSelected.png"] forState:UIControlStateSelected barMetrics:UIBarMetricsDefault];
-        [_segmentedControl setBackgroundImage:[UIImage imageNamed:@"ModernSegmentedControlSelected.png"] forState:UIControlStateSelected | UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
-        [_segmentedControl setBackgroundImage:[UIImage imageNamed:@"ModernSegmentedControlHighlighted.png"] forState:UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
-        UIImage *dividerImage = [UIImage imageNamed:@"ModernSegmentedControlDivider.png"];
-        [_segmentedControl setDividerImage:dividerImage forLeftSegmentState:UIControlStateNormal rightSegmentState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
+        [_segmentedControl setBackgroundImage:self.presentation.images.segmentedControlBackgroundImage forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
+        [_segmentedControl setBackgroundImage:self.presentation.images.segmentedControlSelectedImage forState:UIControlStateSelected barMetrics:UIBarMetricsDefault];
+        [_segmentedControl setBackgroundImage:self.presentation.images.segmentedControlSelectedImage forState:UIControlStateSelected | UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
+        [_segmentedControl setBackgroundImage:self.presentation.images.segmentedControlHighlightedImage forState:UIControlStateHighlighted barMetrics:UIBarMetricsDefault];
+        [_segmentedControl setDividerImage:self.presentation.images.segmentedControlDividerImage forLeftSegmentState:UIControlStateNormal rightSegmentState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
         
-        [_segmentedControl setTitleTextAttributes:@{UITextAttributeTextColor: TGAccentColor(), UITextAttributeTextShadowColor: [UIColor clearColor], UITextAttributeFont: TGSystemFontOfSize(13)} forState:UIControlStateNormal];
-        [_segmentedControl setTitleTextAttributes:@{UITextAttributeTextColor: [UIColor whiteColor], UITextAttributeTextShadowColor: [UIColor clearColor], UITextAttributeFont: TGSystemFontOfSize(13)} forState:UIControlStateSelected];*/
+        [_segmentedControl setTitleTextAttributes:@{UITextAttributeTextColor:self.presentation.pallete.navigationButtonColor, UITextAttributeTextShadowColor: [UIColor clearColor], UITextAttributeFont: TGSystemFontOfSize(13)} forState:UIControlStateNormal];
+        [_segmentedControl setTitleTextAttributes:@{UITextAttributeTextColor:self.presentation.pallete.accentContrastColor, UITextAttributeTextShadowColor: [UIColor clearColor], UITextAttributeFont: TGSystemFontOfSize(13)} forState:UIControlStateSelected];
         
         [_segmentedControl setSelectedSegmentIndex:0];
         [_segmentedControl addTarget:self action:@selector(segmentedControlChanged) forControlEvents:UIControlEventValueChanged];
@@ -527,7 +525,7 @@ static SSignal *statsSignal(MTNetworkUsageCalculationInfo *baseInfo) {
 
 - (void)resetStatsPressed {
     __weak TGNetworkUsageController *weakSelf = self;
-    [[[TGActionSheet alloc] initWithTitle:TGLocalized(@"NetworkUsageSettings.ResetStatsConfirmation") actions:@[
+    [[[TGCustomActionSheet alloc] initWithTitle:TGLocalized(@"NetworkUsageSettings.ResetStatsConfirmation") actions:@[
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"NetworkUsageSettings.ResetStats") action:@"reset" type:TGActionSheetActionTypeDestructive],
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Common.Cancel") action:@"cancel" type:TGActionSheetActionTypeCancel]
     ] actionBlock:^(__unused id target, NSString *action) {

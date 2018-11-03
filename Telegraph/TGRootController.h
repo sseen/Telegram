@@ -1,4 +1,4 @@
-#import "TGViewController.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import <SSignalKit/SSignalKit.h>
 
@@ -9,6 +9,7 @@
 @class TGMainTabsController;
 @class TGCallStatusBarView;
 @class TGVolumeBarView;
+@class TGPresentation;
 
 @interface TGRootController : TGViewController
 
@@ -20,8 +21,11 @@
 @property (nonatomic, strong, readonly) TGCallStatusBarView *callStatusBarView;
 @property (nonatomic, strong, readonly) TGVolumeBarView *volumeBarView;
 
+@property (nonatomic, readonly) TGPresentation *presentation;
+
 - (SSignal *)sizeClass;
 - (bool)isSplitView;
+- (bool)isSlideOver;
 - (CGRect)applicationBounds;
 
 - (bool)callStatusBarHidden;
@@ -31,6 +35,8 @@
 - (void)popToContentController:(UIViewController *)contentController;
 - (void)clearContentControllers;
 - (NSArray *)viewControllers;
+
+- (void)resetControllers;
 
 - (void)localizationUpdated;
 

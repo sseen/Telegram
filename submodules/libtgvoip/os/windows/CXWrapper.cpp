@@ -40,7 +40,7 @@ VoIPControllerWrapper::VoIPControllerWrapper(){
 	controller=new VoIPController();
 	controller->implData=(void*)this;
 	controller->SetStateCallback(VoIPControllerWrapper::OnStateChanged);
-	stateCallback=nullptr;
+	controller->SetSignalBarsCountCallback(VoIPControllerWrapper::OnSignalBarsChanged);
 }
 
 VoIPControllerWrapper::~VoIPControllerWrapper(){
@@ -62,7 +62,7 @@ void VoIPControllerWrapper::SetPublicEndpoints(const Platform::Array<libtgvoip::
 		libtgvoip::Endpoint^ _ep = endpoints[i];
 		tgvoip::Endpoint ep;
 		ep.id = _ep->id;
-		ep.type = EP_TYPE_UDP_RELAY;
+		ep.type = Endpoint::TYPE_UDP_RELAY;
 		char buf[128];
 		if (_ep->ipv4){
 			WideCharToMultiByte(CP_UTF8, 0, _ep->ipv4->Data(), -1, buf, sizeof(buf), NULL, NULL);
@@ -83,10 +83,6 @@ void VoIPControllerWrapper::SetPublicEndpoints(const Platform::Array<libtgvoip::
 
 void VoIPControllerWrapper::SetNetworkType(NetworkType type){
 	controller->SetNetworkType((int)type);
-}
-
-void VoIPControllerWrapper::SetStateCallback(IStateCallback^ callback){
-	stateCallback=callback;
 }
 
 void VoIPControllerWrapper::SetMicMute(bool mute){
@@ -136,26 +132,49 @@ void VoIPControllerWrapper::OnStateChanged(VoIPController* c, int state){
 	reinterpret_cast<VoIPControllerWrapper^>(c->implData)->OnStateChangedInternal(state);
 }
 
+void VoIPControllerWrapper::OnSignalBarsChanged(VoIPController* c, int count){
+	reinterpret_cast<VoIPControllerWrapper^>(c->implData)->OnSignalBarsChangedInternal(count);
+}
+
 void VoIPControllerWrapper::OnStateChangedInternal(int state){
-	if(stateCallback)
-		stateCallback->OnCallStateChanged((CallState)state);
+	CallStateChanged(this, (CallState)state);
+}
+
+void VoIPControllerWrapper::OnSignalBarsChangedInternal(int count){
+	SignalBarsChanged(this, count);
 }
 
 void VoIPControllerWrapper::SetConfig(double initTimeout, double recvTimeout, DataSavingMode dataSavingMode, bool enableAEC, bool enableNS, bool enableAGC, Platform::String^ logFilePath, Platform::String^ statsDumpFilePath){
-	voip_config_t config{0};
-	config.init_timeout=initTimeout;
-	config.recv_timeout=recvTimeout;
-	config.data_saving=(int)dataSavingMode;
+	VoIPController::Config config{0};
+	config.initTimeout=initTimeout;
+	config.recvTimeout=recvTimeout;
+	config.dataSaving=(int)dataSavingMode;
 	config.enableAEC=enableAEC;
 	config.enableAGC=enableAGC;
 	config.enableNS=enableNS;
-	if(logFilePath!=nullptr){
+	if(logFilePath!=nullptr&&!logFilePath->IsEmpty()){
 		WideCharToMultiByte(CP_UTF8, 0, logFilePath->Data(), -1, config.logFilePath, sizeof(config.logFilePath), NULL, NULL);
 	}
-	if(statsDumpFilePath!=nullptr){
+	if(statsDumpFilePath!=nullptr&&!statsDumpFilePath->IsEmpty()){
 		WideCharToMultiByte(CP_UTF8, 0, statsDumpFilePath->Data(), -1, config.statsDumpFilePath, sizeof(config.statsDumpFilePath), NULL, NULL);
 	}
 	controller->SetConfig(&config);
+}
+
+void VoIPControllerWrapper::SetProxy(ProxyProtocol protocol, Platform::String^ address, uint16_t port, Platform::String^ username, Platform::String^ password){
+	char _address[2000];
+	char _username[256];
+	char _password[256];
+
+	WideCharToMultiByte(CP_UTF8, 0, address->Data(), -1, _address, sizeof(_address), NULL, NULL);
+	WideCharToMultiByte(CP_UTF8, 0, username->Data(), -1, _username, sizeof(_username), NULL, NULL);
+	WideCharToMultiByte(CP_UTF8, 0, password->Data(), -1, _password, sizeof(_password), NULL, NULL);
+
+	controller->SetProxy((int)protocol, _address, port, _username, _password);
+}
+
+void VoIPControllerWrapper::SetAudioOutputGainControlEnabled(bool enabled){
+	controller->SetAudioOutputGainControlEnabled(enabled);
 }
 
 void VoIPControllerWrapper::UpdateServerConfig(Platform::String^ json){

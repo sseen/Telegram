@@ -1,42 +1,33 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGModernGalleryVideoItemView.h"
+
+#import <LegacyComponents/LegacyComponents.h>
 
 #import <AVFoundation/AVFoundation.h>
 
-#import "TGImageUtils.h"
-#import "TGImageView.h"
+#import <LegacyComponents/TGImageView.h>
 
 #import "TGModernGalleryVideoItem.h"
-#import "TGVideoMediaAttachment.h"
 
 #import "TGVideoDownloadActor.h"
 
 #import "TGModernGalleryVideoScrubbingInterfaceView.h"
 #import "TGModernGalleryRotationGestureRecognizer.h"
 #import "TGModernGalleryVideoFooterView.h"
-#import "TGModernGalleryVideoView.h"
-#import "TGModernGalleryVideoContentView.h"
-#import "TGModernGalleryDefaultFooterView.h"
+#import <LegacyComponents/TGModernGalleryVideoView.h>
+#import <LegacyComponents/TGModernGalleryVideoContentView.h>
+#import <LegacyComponents/TGModernGalleryDefaultFooterView.h>
 
-#import "TGDoubleTapGestureRecognizer.h"
+#import <LegacyComponents/TGDoubleTapGestureRecognizer.h>
 
-#import "TGTimerTarget.h"
-#import "TGObserverProxy.h"
+#import <LegacyComponents/TGTimerTarget.h>
+#import <LegacyComponents/TGObserverProxy.h>
 
-#import "TGModernButton.h"
-#import "TGMessageImageViewOverlayView.h"
+#import <LegacyComponents/TGModernButton.h>
+#import <LegacyComponents/TGMessageImageViewOverlayView.h>
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGDownloadManager.h"
-#import "TGMessage.h"
 
 #import "TGAudioSessionManager.h"
 
@@ -222,6 +213,16 @@
             __strong TGModernGalleryVideoItemView *strongSelf = weakSelf;
             [strongSelf pausePressed];
         };
+        _footerView.backwardPressed = ^
+        {
+            __strong TGModernGalleryVideoItemView *strongSelf = weakSelf;
+            [strongSelf backwardPressed];
+        };
+        _footerView.forwardPressed = ^
+        {
+            __strong TGModernGalleryVideoItemView *strongSelf = weakSelf;
+            [strongSelf forwardPressed];
+        };
         
         TGModernGalleryRotationGestureRecognizer *rotationRecognizer = [[TGModernGalleryRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotationGesture:)];
         rotationRecognizer.cancelsTouchesInView = false;
@@ -279,7 +280,8 @@
     self.isPlaying = false;
     _autoplayAfterDownload = false;
     
-    [self footerView].hidden = true;
+    if ([self footerView] == _footerView)
+        [self footerView].hidden = true;
 }
 
 - (void)cleanupCurrentPlayer
@@ -449,7 +451,8 @@
     
     [self cleanupCurrentPlayer];
     
-    [self footerView].hidden = true;
+    if ([self footerView] == _footerView)
+        [self footerView].hidden = true;
     
     CGSize dimensions = CGSizeZero;
     NSTimeInterval duration = 0.0;
@@ -480,6 +483,7 @@
         }
     }
     
+    _footerView.duration = duration;
     [_scrubbingInterfaceView setDuration:duration currentTime:0.0 isPlaying:false isPlayable:false animated:false];
     
     if (videoPath != nil)
@@ -647,7 +651,8 @@
                 
                 [self layoutSubviews];
                 
-                [self footerView].hidden = false;
+                if ([self footerView] == _footerView)
+                    [self footerView].hidden = false;
                 [self setDefaultFooterHidden:true];
             }
         }
@@ -685,6 +690,18 @@
     [self updatePosition:false forceZero:false];
     
     _actionButton.hidden = true;
+}
+
+- (void)backwardPressed
+{
+    NSTimeInterval positionSeconds = MAX(0.0, CMTimeGetSeconds(self.player.currentItem.currentTime) - 15.0);
+    [self.player.currentItem seekToTime:CMTimeMake((int64_t)(positionSeconds * 1000.0), 1000.0)];
+}
+
+- (void)forwardPressed
+{
+    NSTimeInterval positionSeconds = MIN(CMTimeGetSeconds(self.player.currentItem.duration), CMTimeGetSeconds(self.player.currentItem.currentTime) + 15.0);
+    [self.player.currentItem seekToTime:CMTimeMake((int64_t)(positionSeconds * 1000.0), 1000.0)];
 }
 
 - (void)playerItemDidPlayToEndTime:(NSNotification *)notification
@@ -755,11 +772,6 @@
             _imageView.frame = playerBounds;
         }
     }
-}
-
-- (UIView *)headerView
-{
-    return _scrubbingInterfaceView;
 }
 
 - (UIView *)footerView
@@ -878,7 +890,8 @@
 {
     if (!isFocused)
     {
-        [self footerView].hidden = true;
+        if ([self footerView] == _footerView)
+            [self footerView].hidden = true;
         [self setDefaultFooterHidden:false];
     }
 }

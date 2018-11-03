@@ -1,5 +1,7 @@
 #import "TGFileDownloadActor.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGTelegraph.h"
 
 #import "TGTelegramNetworking.h"
@@ -7,18 +9,18 @@
 #import <MTProtoKit/MTRequestMessageService.h>
 #import <MTProtoKit/MTRequest.h>
 
-#import "ActionStage.h"
-#import "SGraphObjectNode.h"
+#import <LegacyComponents/ActionStage.h>
+#import <LegacyComponents/SGraphObjectNode.h>
 
 #import "TGImageInfo+Telegraph.h"
-
-#import "TGStringUtils.h"
 
 #import <MTProtoKit/MTEncryption.h>
 
 #import "TGAppDelegate.h"
 
 #import "TGCdnFileData.h"
+
+#import "TGDownloadMessagesSignal.h"
 
 @interface TGFileDownloadActor () <TGRawHttpActor>
 {
@@ -30,6 +32,8 @@
     id _workerToken;
     
     SMetaDisposable *_disposable;
+    
+    NSDictionary *_cdnFilePartHashes;
 }
 
 @property (nonatomic, strong) TGNetworkWorkerGuard *worker;
@@ -189,18 +193,35 @@
     int fileId = 0;
     int64_t secret = 0;
     int datacenterId = 0;
+    NSString *fileReferenceStr = nil;
     
-    if (extractFileUrlComponents(url, &datacenterId, &volumeId, &fileId, &secret) && datacenterId != 0)
+    if (extractFileUrlComponentsWithFileRef(url, &datacenterId, &volumeId, &fileId, &secret, &fileReferenceStr) && datacenterId != 0)
     {
         [ActionStageInstance() nodeRetrieveProgress:self.path progress:0.001f];
-
+        
+        TGMediaOriginInfo *originInfo = options[@"originInfo"];
+        if (originInfo == nil && fileReferenceStr != nil)
+        {
+            NSString *decoded = (__bridge_transfer NSString *)CFURLCreateStringByReplacingPercentEscapesUsingEncoding(NULL, (CFStringRef)fileReferenceStr, CFSTR(""), kCFStringEncodingUTF8);
+            fileReferenceStr = decoded;
+            
+            if ([fileReferenceStr hasPrefix:@"o"]) {
+                NSString *originStr = [fileReferenceStr substringFromIndex:1];
+                originInfo = [TGMediaOriginInfo mediaOriginInfoWithStringRepresentation:originStr];
+            } else {
+                NSData *fileReference = [NSData dataWithHexString:fileReferenceStr];
+                NSString *key = [NSString stringWithFormat:@"%lld_%d", volumeId, fileId];
+                originInfo = [TGMediaOriginInfo mediaOriginInfoWithFileReference:fileReference fileReferences:@{key: fileReference}];
+            }
+        }
+        
         TGNetworkMediaTypeTag mediaTypeTag = (TGNetworkMediaTypeTag)[options[@"mediaTypeTag"] intValue];
         __weak TGFileDownloadActor *weakSelf = self;
         _workerToken = [[TGTelegramNetworking instance] requestDownloadWorkerForDatacenterId:datacenterId type:mediaTypeTag completion:^(TGNetworkWorkerGuard *worker)
         {
             __strong TGFileDownloadActor *strongSelf = weakSelf;
             if (strongSelf != nil) {
-                [strongSelf proceedWithWorker:worker type:mediaTypeTag fileData:nil datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret];
+                [strongSelf proceedWithWorker:worker type:mediaTypeTag fileData:nil datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret originInfo:originInfo retrying:false];
             }
         }];
     }
@@ -210,7 +231,7 @@
     }
 }
     
-- (void)proceedWithWorker:(TGNetworkWorkerGuard *)worker type:(TGNetworkMediaTypeTag)mediaTypeTag fileData:(TGCdnFileData *)fileData datacenterId:(NSInteger)datacenterId volumeId:(int64_t)volumeId fileId:(int32_t)fileId secret:(int64_t)secret {
+- (void)proceedWithWorker:(TGNetworkWorkerGuard *)worker type:(TGNetworkMediaTypeTag)mediaTypeTag fileData:(TGCdnFileData *)fileData datacenterId:(NSInteger)datacenterId volumeId:(int64_t)volumeId fileId:(int32_t)fileId secret:(int64_t)secret originInfo:(TGMediaOriginInfo *)originInfo retrying:(bool)retrying {
     self.worker = worker;
     
     id requestData = nil;
@@ -227,6 +248,7 @@
         location.volume_id = volumeId;
         location.local_id = fileId;
         location.secret = secret;
+        location.file_reference = [originInfo fileReferenceForVolumeId:volumeId localId:fileId] ?: [NSData data];
         
         getFile.location = location;
         getFile.limit = 1 * 1024 * 1024;
@@ -248,7 +270,13 @@
                         [strongSelf fileDownloadSuccess:volumeId fileId:fileId secret:secret data:((TLupload_File$upload_file *)response).bytes];
                     } else if ([response isKindOfClass:[TLupload_File$upload_fileCdnRedirect class]]) {
                         TLupload_File$upload_fileCdnRedirect *redirect = (TLupload_File$upload_fileCdnRedirect *)response;
-                        [strongSelf switchToCdn:redirect.dc_id fileData:[[TGCdnFileData alloc] initWithCdnId:redirect.dc_id token:redirect.file_token encryptionKey:redirect.encryption_key encryptionIv:redirect.encryption_iv] type:mediaTypeTag datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret];
+                        
+                        NSMutableDictionary *hashDict = [[NSMutableDictionary alloc] init];
+                        for (TLFileHash$fileHash *nHash in redirect.file_hashes) {
+                            hashDict[@(nHash.offset)] = nHash.n_hash;
+                        }
+                        
+                        [strongSelf switchToCdn:redirect.dc_id fileData:[[TGCdnFileData alloc] initWithCdnId:redirect.dc_id token:redirect.file_token encryptionKey:redirect.encryption_key encryptionIv:redirect.encryption_iv] type:mediaTypeTag datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret partHashes:hashDict];
                     } else {
                         [strongSelf fileDownloadFailed:volumeId fileId:fileId secret:secret];
                     }
@@ -270,7 +298,22 @@
                 }
             }
             else {
-                [strongSelf fileDownloadFailed:volumeId fileId:fileId secret:secret];
+                int32_t errorCode = [[TGTelegramNetworking instance] extractNetworkErrorCode:error];
+                NSString *errorString = [[TGTelegramNetworking instance] extractNetworkErrorType:error];
+                if (!retrying && originInfo != nil && errorCode == 400 && [errorString hasPrefix:@"FILE_REFERENCE_"])
+                {
+                    [[TGDownloadMessagesSignal updatedOriginInfo:originInfo identifier:0] startWithNext:^(TGMediaOriginInfo *next)
+                    {
+                        [strongSelf proceedWithWorker:worker type:mediaTypeTag fileData:nil datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret originInfo:next retrying:true];
+                    } error:^(__unused id error)
+                    {
+                        [strongSelf fileDownloadFailed:volumeId fileId:fileId secret:secret];
+                    } completed:nil];
+                }
+                else
+                {
+                    [strongSelf fileDownloadFailed:volumeId fileId:fileId secret:secret];
+                }
             }
         }];
     }];
@@ -287,7 +330,17 @@
     [worker.strongWorker addRequest:request];
 }
     
-- (void)switchToCdn:(int32_t)cdnId fileData:(TGCdnFileData *)fileData type:(TGNetworkMediaTypeTag)mediaTypeTag datacenterId:(NSInteger)datacenterId volumeId:(int64_t)volumeId fileId:(int32_t)fileId secret:(int64_t)secret {
+- (void)switchToCdn:(int32_t)cdnId fileData:(TGCdnFileData *)fileData type:(TGNetworkMediaTypeTag)mediaTypeTag datacenterId:(NSInteger)datacenterId volumeId:(int64_t)volumeId fileId:(int32_t)fileId secret:(int64_t)secret partHashes:(NSDictionary *)partHashes {
+    NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+    if (partHashes != nil) {
+        [dict addEntriesFromDictionary:partHashes];
+    }
+    int32_t maxOffset = 0;
+    for (NSNumber *nOffset in dict.keyEnumerator) {
+        maxOffset = MAX(maxOffset, [nOffset intValue] + 128 * 1024);
+    }
+    _cdnFilePartHashes = dict;
+    
     [[TGTelegramNetworking instance] cancelDownloadWorkerRequestByToken:_workerToken];
     _workerToken = nil;
     
@@ -295,7 +348,7 @@
     _workerToken = [[TGTelegramNetworking instance] requestDownloadWorkerForDatacenterId:cdnId type:mediaTypeTag isCdn:true completion:^(TGNetworkWorkerGuard *worker) {
         __strong TGFileDownloadActor *strongSelf = weakSelf;
         if (strongSelf != nil) {
-            [strongSelf proceedWithWorker:worker type:mediaTypeTag fileData:fileData datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret];
+            [strongSelf proceedWithWorker:worker type:mediaTypeTag fileData:fileData datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret originInfo:nil retrying:false];
         }
     }];
 }
@@ -317,7 +370,7 @@
                     __strong TGFileDownloadActor *strongSelf = weakSelf;
                     if (strongSelf != nil) {
                         if (error == nil) {
-                            [strongSelf switchToCdn:cdnId fileData:fileData type:mediaTypeTag datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret];
+                            [strongSelf switchToCdn:cdnId fileData:fileData type:mediaTypeTag datacenterId:datacenterId volumeId:volumeId fileId:fileId secret:secret partHashes:strongSelf->_cdnFilePartHashes];
                         } else {
                             [strongSelf fileDownloadFailed:volumeId fileId:fileId secret:secret];
                         }
@@ -414,6 +467,31 @@
     NSMutableData *finalData = [[NSMutableData alloc] initWithData:decryptedData];
     if (_finalFileSize != 0)
         [finalData setLength:_finalFileSize];
+    
+    if (_cdnFilePartHashes != nil) {
+        NSData *dataToWrite = finalData;
+        int32_t basePartOffset = 0;
+        for (int32_t localOffset = 0; localOffset < (int32_t)dataToWrite.length; localOffset += 128 * 1024) {
+            int32_t partOffset = basePartOffset + localOffset;
+            NSData *hashData = _cdnFilePartHashes[@(partOffset)];
+            if (hashData == nil) {
+                TGLog(@"File CDN part hash missing at %d", partOffset);
+                [ActionStageInstance() actionFailed:self.path reason:-1];
+                return;
+            }
+            NSData *localHash = nil;
+            if (partOffset + 128 * 1024 > (int32_t)dataToWrite.length) {
+                localHash = MTSha256([[NSData alloc] initWithBytesNoCopy:(void *)dataToWrite.bytes + localOffset length:(int32_t)dataToWrite.length - localOffset freeWhenDone:false]);
+            } else {
+                localHash = MTSha256([[NSData alloc] initWithBytesNoCopy:(void *)dataToWrite.bytes + localOffset length:128 * 1024 freeWhenDone:false]);
+            }
+            if (![localHash isEqual:hashData]) {
+                TGLog(@"File CDN part hash mismatch at %d", partOffset);
+                [ActionStageInstance() actionFailed:self.path reason:-1];
+                return;
+            }
+        }
+    }
     
     [ActionStageInstance() nodeRetrieved:self.path node:[[SGraphObjectNode alloc] initWithObject:finalData]];
 }

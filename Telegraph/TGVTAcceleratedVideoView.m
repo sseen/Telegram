@@ -1,14 +1,14 @@
 #import "TGVTAcceleratedVideoView.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import <SSignalKit/SSignalKit.h>
 #import <AVFoundation/AVFoundation.h>
 
-#import "TGObserverProxy.h"
+#import <LegacyComponents/TGObserverProxy.h>
 
 #import <libkern/OSAtomic.h>
 #import <pthread.h>
-
-#import "TGImageUtils.h"
 
 #import "TGImageMessageViewModel.h"
 
@@ -185,6 +185,14 @@ static int32_t nextSessionId = 0;
         
         _queue = queue;
         
+        if ([path hasSuffix:@".gif"])
+        {
+            NSString *movPath = [path stringByReplacingCharactersInRange:NSMakeRange(path.length - 4, 4) withString:@".mp4"];
+            [[NSFileManager defaultManager] removeItemAtPath:movPath error:nil];
+            [[NSFileManager defaultManager] createSymbolicLinkAtPath:movPath withDestinationPath:path error:nil];
+            path = movPath;
+        }
+        
         _path = path;
         _frameReady = [frameReady copy];
         
@@ -306,9 +314,6 @@ static int32_t nextSessionId = 0;
                 
                 if (_output != nil) {
                     _output.alwaysCopiesSampleData = false;
-                    if (false && iosMajorVersion() >= 8) {
-                        _output.supportsRandomAccess = true;
-                    }
                     
                     _reader = [[AVAssetReader alloc] initWithAsset:asset error:nil];
                     if ([_reader canAddOutput:_output]) {
@@ -425,7 +430,8 @@ static NSMutableDictionary *queueItemsByPath() {
             [[self controlQueue] dispatch:^{
                 __strong TGVTAcceleratedVideoFrameQueueItem *strongItem = weakItem;
                 if (strongItem != nil) {
-                    for (TGVTAcceleratedVideoFrameQueueGuardItem *guardItem in strongItem.guards) {
+                    for (NSUInteger i = 0; i < item.guards.count; i++) {
+                        TGVTAcceleratedVideoFrameQueueGuardItem *guardItem = item.guards[i];
                         [guardItem.guard draw:frame];
                     }
                 }
@@ -523,6 +529,9 @@ static NSMutableDictionary *queueItemsByPath() {
         [self.layer addSublayer:_displayLayer];
         
         _pendingFrames = [[NSMutableArray alloc] init];
+        
+        if (iosMajorVersion() >= 11)
+            self.accessibilityIgnoresInvertColors = true;
     }
     return self;
 }

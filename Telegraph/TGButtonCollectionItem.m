@@ -10,7 +10,6 @@
     if (self != nil)
     {
         _title = title;
-        _titleColor = TGAccentColor();
         _alignment = NSTextAlignmentLeft;
         _enabled = true;
         
@@ -37,7 +36,10 @@
     {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        [actionTarget performSelector:_action];
+        if ([NSStringFromSelector(_action) rangeOfString:@":"].location != NSNotFound)
+            [actionTarget performSelector:_action withObject:self];
+        else
+            [actionTarget performSelector:_action];
 #pragma clang diagnostic pop
     }
 }
@@ -71,6 +73,14 @@
     
     if (self.view != nil)
         [(TGButtonCollectionItemView *)self.view setTitle:title];
+}
+
+- (void)setTitleColor:(UIColor *)titleColor
+{
+    _titleColor = titleColor;
+    
+    if (self.view != nil)
+        [(TGButtonCollectionItemView *)self.view setTitleColor:titleColor];
 }
 
 - (void)setEnabled:(bool)enabled

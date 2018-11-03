@@ -3,20 +3,24 @@
 #import "TGStickersSignals.h"
 #import "TGMaskStickersSignals.h"
 
-#import "TGStickerPack.h"
+#import <LegacyComponents/TGStickerPack.h>
 
 #import "TGStickerPackCollectionItem.h"
 
 #import "TGStickersMenu.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 
 #import "TGCommentCollectionItem.h"
 
 #import "TGArchivedStickerPacksAlert.h"
 
-#import "TGActionSheet.h"
-#import "TGMenuSheetController.h"
+#import "TGCustomActionSheet.h"
+#import <LegacyComponents/TGMenuSheetController.h>
+
+#import "TGLegacyComponentsContext.h"
+
+#import "TGPresentation.h"
 
 @interface TGArchivedStickerPacksController () {
     SMetaDisposable *_packsDisposable;
@@ -94,6 +98,7 @@
         _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
         _activityIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
         _activityIndicator.frame = CGRectMake(CGFloor((self.view.frame.size.width - _activityIndicator.frame.size.width) / 2.0f), CGFloor((self.view.frame.size.height - _activityIndicator.frame.size.height) / 2.0f), _activityIndicator.frame.size.width, _activityIndicator.frame.size.height);
+        _activityIndicator.color = self.presentation.pallete.collectionMenuCommentColor;
         [self.view addSubview:_activityIndicator];
         [_activityIndicator startAnimating];
         self.collectionView.hidden = true;
@@ -197,7 +202,7 @@
 
 - (void)deleteStickerPack:(TGStickerPack *)stickerPack {
     __weak TGArchivedStickerPacksController *weakSelf = self;
-    [[[TGActionSheet alloc] initWithTitle:nil actions:@[
+    [[[TGCustomActionSheet alloc] initWithTitle:nil actions:@[
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Common.Delete") action:@"delete" type:TGActionSheetActionTypeDestructive],
         [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Common.Cancel") action:@"cancel" type:TGActionSheetActionTypeCancel],
     ] actionBlock:^(__unused id target, NSString *action) {
@@ -318,7 +323,7 @@
             }
             
             if (archivedPacks.count != 0) {
-                TGArchivedStickerPacksAlert *previewWindow = [[TGArchivedStickerPacksAlert alloc] initWithParentController:strongSelf stickerPacks:archivedPacks];
+                TGArchivedStickerPacksAlert *previewWindow = [[TGArchivedStickerPacksAlert alloc] initWithManager:[[TGLegacyComponentsContext shared] makeOverlayWindowManager] parentController:strongSelf stickerPacks:archivedPacks];
                 __weak TGArchivedStickerPacksAlert *weakPreviewWindow = previewWindow;
                 previewWindow.view.dismiss = ^
                 {

@@ -1,20 +1,19 @@
 #import "TGConversationAddMessagesActor.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGTelegraph.h"
 #import "TGTelegramNetworking.h"
 
 #import "TGDatabase.h"
-#import "TGMessage.h"
 
 #import "TGAppDelegate.h"
 
-#import "SGraphObjectNode.h"
+#import <LegacyComponents/SGraphObjectNode.h>
 
 #import "TGInterfaceManager.h"
-
-#import "TGPeerIdAdapter.h"
 
 #import "TGRecentGifsSignal.h"
 #import "TGRecentStickersSignal.h"
@@ -399,7 +398,7 @@
         [TGRecentGifsSignal addRemoteRecentGifFromDocuments:remoteGifDocuments];
     }
     if (remoteStickerDocuments.count != 0) {
-        [TGRecentStickersSignal addRemoteRecentStickerFromDocuments:remoteStickerDocuments];
+        [TGRecentStickersSignal addRemoteRecentStickerFromDocuments:remoteStickerDocuments sync:false];
     }
     
     [ActionStageInstance() actionCompleted:self.path result:nil];

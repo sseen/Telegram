@@ -1,15 +1,13 @@
 #import "TGAnimatedMediaContextResultCell.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGBotContextExternalResult.h"
 #import "TGBotContextMediaResult.h"
 
-#import "TGImageUtils.h"
-#import "TGStringUtils.h"
-#import "TGFont.h"
-
-#import "TGImageView.h"
+#import <LegacyComponents/TGImageView.h>
 #import "TGVTAcceleratedVideoView.h"
 
 #import "TGSharedPhotoSignals.h"
@@ -17,11 +15,11 @@
 
 #import "TGPreparedLocalDocumentMessage.h"
 #import "TGTelegraph.h"
-#import "TGGifConverter.h"
+#import <LegacyComponents/TGGifConverter.h>
 
 #import "TGMediaStoreContext.h"
 
-#import "TGMessageImageViewOverlayView.h"
+#import <LegacyComponents/TGMessageImageViewOverlayView.h>
 
 #import "TGSharedMediaSignals.h"
 
@@ -144,7 +142,7 @@
             [concreteResult.photo.imageInfo imageUrlForLargestSize:&imageSize];
             imageSize = TGFitSize(TGFillSizeF(imageSize, fitSize), fitSize);
             
-            [_imageView setSignal:[TGSharedPhotoSignals cachedRemoteThumbnail:concreteResult.photo.imageInfo size:imageSize pixelProcessingBlock:nil cacheVariantKey:@"mediaContextPanel" threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] diskCache:[TGSharedMediaUtils sharedMediaTemporaryPersistentCache]]];
+            [_imageView setSignal:[TGSharedPhotoSignals cachedRemoteThumbnail:concreteResult.photo.imageInfo size:imageSize pixelProcessingBlock:nil cacheVariantKey:@"mediaContextPanel" threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] diskCache:[TGSharedMediaUtils sharedMediaTemporaryPersistentCache] originInfo:concreteResult.photo.originInfo identifier:concreteResult.photo.imageId]];
         } else if (concreteResult.document != nil) {
             bool isSticker = false;
             bool isAnimation = false;
@@ -165,9 +163,17 @@
             if (isSticker) {
                 NSMutableString *uri = [[NSMutableString alloc] initWithString:@"sticker-preview://?"];
                 if (concreteResult.document.documentId != 0)
+                {
                     [uri appendFormat:@"documentId=%" PRId64 "", concreteResult.document.documentId];
+                    
+                    TGMediaOriginInfo *originInfo = concreteResult.document.originInfo ?: [TGMediaOriginInfo mediaOriginInfoForDocumentAttachment:concreteResult.document];
+                    if (originInfo != nil)
+                        [uri appendFormat:@"&origin_info=%@", [originInfo stringRepresentation]];
+                }
                 else
+                {
                     [uri appendFormat:@"localDocumentId=%" PRId64 "", concreteResult.document.localDocumentId];
+                }
                 [uri appendFormat:@"&accessHash=%" PRId64 "", concreteResult.document.accessHash];
                 [uri appendFormat:@"&datacenterId=%" PRId32 "", (int32_t)concreteResult.document.datacenterId];
                 
@@ -304,10 +310,10 @@
                                                         return nil;
                                                     }];
                                                     return [dataSignal mapToSignal:^SSignal *(NSData *data) {
-                                                        return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSString *tempPath) {
+                                                        return [[TGGifConverter convertGifToMp4:data] mapToSignal:^SSignal *(NSDictionary *dict) {
                                                             return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subsctiber) {
                                                                 NSError *error = nil;
-                                                                [[NSFileManager defaultManager] moveItemAtPath:tempPath toPath:videoPath error:&error];
+                                                                [[NSFileManager defaultManager] moveItemAtPath:dict[@"path"] toPath:videoPath error:&error];
                                                                 if (error != nil) {
                                                                     [subsctiber putError:nil];
                                                                 } else {
@@ -365,7 +371,7 @@
                         }
                         if ([externalResult.resultId isEqualToString:currentExternalResult.resultId]) {
                             if (path != nil) {
-                                if ([externalResult.contentType isEqualToString:@"video/mp4"]) {
+                                if ([externalResult.content.mimeType isEqualToString:@"video/mp4"]) {
                                     [strongSelf->_videoView removeFromSuperview];
                                     strongSelf->_videoView = [[[TGVTAcceleratedVideoView videoViewClass] alloc] initWithFrame:strongSelf.bounds];
                                     [strongSelf insertSubview:strongSelf->_videoView aboveSubview:strongSelf->_overlayView];
@@ -390,7 +396,7 @@
                 } else if ([externalResult.sendMessage isKindOfClass:[TGBotContextResultSendMessageGeo class]]) {
                     TGBotContextResultSendMessageGeo *concreteMessage = (TGBotContextResultSendMessageGeo *)externalResult.sendMessage;
                     CGSize mapImageSize = CGSizeMake(75.0f, 75.0f);
-                    NSString *mapUri = [[NSString alloc] initWithFormat:@"map-thumbnail://?latitude=%f&longitude=%f&width=%d&height=%d&flat=1&cornerRadius=-1", concreteMessage.location.latitude, concreteMessage.location.longitude, (int)mapImageSize.width, (int)mapImageSize.height];
+                    NSString *mapUri = [[NSString alloc] initWithFormat:@"map-thumbnail://?latitude=%f&longitude=%f&width=%d&height=%d&flat=1&cornerRadius=-1&offset=-10", concreteMessage.location.latitude, concreteMessage.location.longitude, (int)mapImageSize.width, (int)mapImageSize.height];
                     imageUrl = mapUri;
                 }
                 
@@ -421,6 +427,8 @@
         }
     } else if ([_result isKindOfClass:[TGBotContextExternalResult class]]) {
         TGBotContextExternalResult *externalResult = (TGBotContextExternalResult *)_result;
+        if (externalResult.originalUrl.length == 0)
+            return;
         
         _overlayView.hidden = false;
         [_overlayView setProgress:0.0f cancelEnabled:false animated:true];
@@ -481,6 +489,11 @@
         [self.selectedBackgroundView addSubview:_selectionView];
     }
     return self;
+}
+
+- (void)setSelectionColor:(UIColor *)color
+{
+    _selectionView.backgroundColor = color;
 }
 
 - (void)prepareForReuse {

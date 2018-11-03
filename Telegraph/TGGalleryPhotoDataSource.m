@@ -1,20 +1,20 @@
 #import "TGGalleryPhotoDataSource.h"
 
-#import "ASQueue.h"
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/ASQueue.h>
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGWorkerPool.h"
 #import "TGWorkerTask.h"
 #import "TGMediaPreviewTask.h"
 
-#import "TGMemoryImageCache.h"
+#import <LegacyComponents/TGMemoryImageCache.h>
 
-#import "TGImageUtils.h"
-#import "TGStringUtils.h"
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 
-#import "TGImageBlur.h"
-#import "UIImage+TG.h"
+#import <LegacyComponents/TGImageBlur.h>
+#import <LegacyComponents/UIImage+TG.h>
 
 #import "TGMediaStoreContext.h"
 
@@ -105,7 +105,7 @@
             
             if (args[@"id"] != nil && args[@"messageId"] != nil && args[@"conversationId"] != nil && args[@"legacy-cache-url"] && args[@"legacy-thumbnail-cache-url"])
             {
-                [ActionStageInstance() requestActor:path options:@{
+                NSMutableDictionary *options = [[NSMutableDictionary alloc] initWithDictionary:@{
                     @"mediaId": args[@"id"],
                     @"messageId": args[@"messageId"],
                     @"conversationId": args[@"conversationId"],
@@ -130,7 +130,12 @@
                         if (progress)
                             progress(value);
                     }
-                } watcher:self];
+                }];
+                
+                if (args[@"origin_info"] != nil)
+                    options[@"originInfo"] = args[@"origin_info"];
+                
+                [ActionStageInstance() requestActor:path options:options watcher:self];
             }
         }
         else

@@ -8,8 +8,8 @@
 
 #import "TGNetworkWorker.h"
 
-#import "ASQueue.h"
-#import "ActionStage.h"
+#import <LegacyComponents/ASQueue.h>
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGTelegraph.h"
 
@@ -18,7 +18,7 @@
 #import <MTProtoKit/MTContext.h>
 #import <MTProtoKit/MTProto.h>
 #import <MTProtoKit/MTRequestMessageService.h>
-#import <MTProtoKit/MTProtoKit.h>
+#import <MTProtoKit/MtProtoKit.h>
 
 #import "TGTelegramNetworking.h"
 

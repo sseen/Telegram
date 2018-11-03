@@ -8,7 +8,7 @@
 
 #import "TGSwitchCollectionItem.h"
 
-#import "ASHandle.h"
+#import <LegacyComponents/ASHandle.h>
 
 #import "TGSwitchCollectionItemView.h"
 
@@ -93,6 +93,17 @@
         
         if ([self boundView] != nil)
             [((TGSwitchCollectionItemView *)[self boundView]) setIsOn:_isOn animated:animated];
+    }
+}
+
+- (void)setIsEnabled:(bool)isEnabled
+{
+    if (_isEnabled != isEnabled)
+    {
+        _isEnabled = isEnabled;
+        
+        if ([self boundView] != nil)
+            [((TGSwitchCollectionItemView *)[self boundView]) setIsEnabled:_isEnabled];
     }
 }
 

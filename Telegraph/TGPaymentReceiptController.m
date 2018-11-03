@@ -1,21 +1,21 @@
 #import "TGPaymentReceiptController.h"
 
-#import "TGMessage.h"
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGDatabase.h"
 #import "TGBotSignals.h"
+#import "TGPresentation.h"
 
 #import "TGPaymentCheckoutHeaderItem.h"
 #import "TGPaymentCheckoutPriceItem.h"
 #import "TGSeparatorCollectionItem.h"
 
-#import "TGModernButton.h"
+#import <LegacyComponents/TGModernButton.h>
 
 #import "TGPaymentCheckoutInfoController.h"
-#import "TGNavigationController.h"
-#import "TGShippingMethodController.h"
 #import "TGPaymentMethodController.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 
 #import "TGPaymentPasswordAlert.h"
 #import "TGTwoStepConfigSignal.h"
@@ -23,8 +23,6 @@
 
 #import "TGStoredTmpPassword.h"
 #import "TGTelegramNetworking.h"
-
-#import "TGAlertView.h"
 
 #import "TGCurrencyFormatter.h"
 
@@ -132,7 +130,7 @@
         [_activityIndicator startAnimating];
     }
     
-    self.collectionView.backgroundColor = [UIColor whiteColor];
+    self.collectionView.backgroundColor = self.presentation.pallete.backgroundColor;
     self.collectionView.scrollEnabled = _receipt != nil;
     
     _payButton = [[TGModernButton alloc] init];
@@ -147,20 +145,18 @@
     _payButtonContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75f];
     [self.view addSubview:_payButtonContainer];
     
-    static UIImage *payButtonImage;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        UIGraphicsBeginImageContextWithOptions(CGSizeMake(48.0f, 48.0f), false, 0.0f);
-        CGContextRef context = UIGraphicsGetCurrentContext();
-        CGContextSetFillColorWithColor(context, UIColorRGB(0x027bff).CGColor);
-        CGContextFillEllipseInRect(context, CGRectMake(0.0f, 0.0f, 48.0f, 48.0f));
-        CGContextSetFillColorWithColor(context, [UIColor whiteColor].CGColor);
-        CGContextFillEllipseInRect(context, CGRectMake(1.0f, 1.0f, 46.0f, 46.0f));
-        payButtonImage = [UIGraphicsGetImageFromCurrentImageContext() stretchableImageWithLeftCapWidth:24 topCapHeight:24];
-        UIGraphicsEndImageContext();
-    });
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(48.0f, 48.0f), false, 0.0f);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetFillColorWithColor(context, self.presentation.pallete.paymentsPayButtonColor.CGColor);
+    CGContextFillEllipseInRect(context, CGRectMake(0.0f, 0.0f, 48.0f, 48.0f));
+    CGContextSetFillColorWithColor(context, self.presentation.pallete.backgroundColor.CGColor);
+    CGContextFillEllipseInRect(context, CGRectMake(1.0f, 1.0f, 46.0f, 46.0f));
+    
+    UIImage *payButtonImage = [UIGraphicsGetImageFromCurrentImageContext() stretchableImageWithLeftCapWidth:24 topCapHeight:24];
+    UIGraphicsEndImageContext();
+    
     _payButton.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [_payButton setTitleColor:UIColorRGB(0x027bff)];
+    [_payButton setTitleColor:self.presentation.pallete.paymentsPayButtonColor];
     _payButton.titleLabel.font = [UIFont boldSystemFontOfSize:17.0f];
     [_payButton setBackgroundImage:payButtonImage forState:UIControlStateNormal];
     [_payButton setTitle:TGLocalized(@"Common.Done") forState:UIControlStateNormal];
@@ -210,7 +206,7 @@
     }
     
     if (_receipt != nil) {
-        int32_t totalPrice = 0;
+        int64_t totalPrice = 0;
         for (TGInvoicePrice *price in _receipt.invoice.prices) {
             NSString *string = [[TGCurrencyFormatter shared] formatAmount:price.amount currency:_receipt.invoice.currency];
             

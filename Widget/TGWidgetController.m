@@ -55,6 +55,8 @@ const UIEdgeInsets TGWidgetCollectionSmallInsets = { 16.0f, 4.0f, 8.0f, 4.0f };
     [self.view addSubview:_effectView];
 
     _collectionView = [[UICollectionView alloc] initWithFrame:self.view.bounds collectionViewLayout:_collectionLayout];
+    if ([_collectionView respondsToSelector:@selector(setContentInsetAdjustmentBehavior:)])
+        _collectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     _collectionView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _collectionView.backgroundColor = [UIColor clearColor];
     _collectionView.dataSource = self;
@@ -116,7 +118,8 @@ const UIEdgeInsets TGWidgetCollectionSmallInsets = { 16.0f, 4.0f, 8.0f, 4.0f };
         [_collectionView layoutSubviews];
     }
     
-    [self.extensionContext setWidgetLargestAvailableDisplayMode:users.count > 4 ? NCWidgetDisplayModeExpanded : NCWidgetDisplayModeCompact];
+    if ([self.extensionContext respondsToSelector:@selector(setWidgetLargestAvailableDisplayMode:)])
+        [self.extensionContext setWidgetLargestAvailableDisplayMode:users.count > 4 ? NCWidgetDisplayModeExpanded : NCWidgetDisplayModeCompact];
 }
 
 - (void)setPasscodeRequired
@@ -139,7 +142,8 @@ const UIEdgeInsets TGWidgetCollectionSmallInsets = { 16.0f, 4.0f, 8.0f, 4.0f };
 - (void)_hideCollectionView
 {
     _collectionView.hidden = true;
-    [self.extensionContext setWidgetLargestAvailableDisplayMode:NCWidgetDisplayModeCompact];
+    if ([self.extensionContext respondsToSelector:@selector(setWidgetLargestAvailableDisplayMode:)])
+        [self.extensionContext setWidgetLargestAvailableDisplayMode:NCWidgetDisplayModeCompact];
 }
 
 - (void)_setLabelText:(NSString *)text
@@ -181,7 +185,11 @@ const UIEdgeInsets TGWidgetCollectionSmallInsets = { 16.0f, 4.0f, 8.0f, 4.0f };
 
 - (bool)isCompactDisplayMode
 {
-    return self.extensionContext.widgetActiveDisplayMode == NCWidgetDisplayModeCompact;
+    if ([self.extensionContext respondsToSelector:@selector(widgetActiveDisplayMode)]) {
+        return self.extensionContext.widgetActiveDisplayMode == NCWidgetDisplayModeCompact;
+    } else {
+        return true;
+    }
 }
 
 - (void)updateExpandedCellsVisibilityAnimated:(bool)animated

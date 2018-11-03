@@ -1,5 +1,5 @@
 #import "TGContactModel.h"
-#import "TGPhoneUtils.h"
+#import "TGLegacyDatabasePhoneUtils.h"
 
 @implementation TGPhoneNumberModel
 
@@ -8,8 +8,8 @@
     self = [super init];
     if (self != nil)
     {
-        _phoneNumber = [TGPhoneUtils cleanInternationalPhone:phoneNumber forceInternational:false];
-        _displayPhoneNumber = [TGPhoneUtils formatPhone:_phoneNumber forceInternational:false];
+        _phoneNumber = [TGLegacyDatabasePhoneUtils cleanInternationalPhone:phoneNumber forceInternational:false];
+        _displayPhoneNumber = [TGLegacyDatabasePhoneUtils formatPhone:_phoneNumber forceInternational:false];
         _label = label;
     }
     return self;
@@ -19,7 +19,7 @@
 
 @implementation TGContactModel
 
-- (instancetype)initWithFirstName:(NSString *)firstName lastName:(NSString *)lastName phoneNumbers:(NSArray *)phoneNumbers
+- (instancetype)initWithFirstName:(NSString *)firstName lastName:(NSString *)lastName phoneNumbers:(NSArray *)phoneNumbers vcard:(TGVCard *)vcard
 {
     self = [super init];
     if (self != nil)
@@ -27,6 +27,7 @@
         _firstName = firstName;
         _lastName = lastName;
         _phoneNumbers = phoneNumbers;
+        _vcard = vcard;
     }
     return self;
 }

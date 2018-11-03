@@ -1,31 +1,32 @@
 #import "TGNotificationController.h"
-#import "TGOverlayControllerWindow.h"
+
+#import <LegacyComponents/LegacyComponents.h>
 
 #import <objc/runtime.h>
 #import <AVFoundation/AVFoundation.h>
 
-#import "TGOverlayController.h"
-#import "TGMenuSheetController.h"
-#import "TGModernGalleryContainerView.h"
+#import "TGLegacyComponentsContext.h"
+#import <LegacyComponents/TGMenuSheetController.h>
+#import <LegacyComponents/TGModernGalleryContainerView.h>
 #import "TGPickerSheet.h"
 #import "TGSingleStickerPreviewWindow.h"
 #import "TGModernConversationController.h"
 #import "TGWebAppController.h"
 #import "TGGenericModernConversationCompanion.h"
+#import "TGFeedConversationCompanion.h"
 #import <SafariServices/SafariServices.h>
 
 #import "TGNotificationOverlayView.h"
 #import "TGNotificationView.h"
+#import "TGCustomAlertView.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGAppDelegate.h"
 #import "TGTelegraph.h"
-#import "TGConversation.h"
 #import "TGDatabase.h"
-#import "TGPeerIdAdapter.h"
 
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 #import "TGDownloadManager.h"
 
 #import "TGSendMessageSignals.h"
@@ -34,7 +35,8 @@
 #import "TGConversationSignals.h"
 #import "TGChatMessageListSignal.h"
 #import "TGStickersSignals.h"
-#import "TGStickerAssociation.h"
+#import "TGBotSignals.h"
+#import <LegacyComponents/TGStickerAssociation.h>
 
 #import "TGMediaStoreContext.h"
 #import "TGPreparedRemoteImageMessage.h"
@@ -45,13 +47,17 @@
 
 #import "TGGenericPeerPlaylistSignals.h"
 #import "TGInstantPageController.h"
+#import "TGGDPRNoticeController.h"
+#import "TGPassportRequestController.h"
+
+#import "TGAudioMediaAttachment+Telegraph.h"
 
 const NSTimeInterval TGNotificationTimerInterval = 0.5;
 const NSUInteger TGNotificationInterItemDelay = 2;
 const NSUInteger TGNotificationInterItemDelayAfterHide = 1;
 const NSUInteger TGNotificationExpandedTimeout = 60;
 
-@interface TGNotificationWindow : UIWindow
+@interface TGNotificationWindow : TGOverlayControllerWindow
 
 @property (nonatomic, copy) bool (^pointInside)(CGPoint);
 
@@ -70,9 +76,9 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
 @property (nonatomic, readonly) int32_t replyToMid;
 @property (nonatomic, readonly) NSTimeInterval duration;
 @property (nonatomic, readonly) bool isChannelGroup;
-@property (nonatomic, copy) void (^configure)(TGNotificationContentView *, bool *);
+@property (nonatomic, copy) void (^configure)(TGNotificationContentView *, bool *, TGBotReplyMarkup **);
 
-- (instancetype)initWithConversation:(TGConversation *)conversation identifier:(int32_t)identifier replyToMid:(int32_t)replyToMid duration:(NSTimeInterval)duration configure:(void (^)(TGNotificationContentView *, bool *))configure;
+- (instancetype)initWithConversation:(TGConversation *)conversation identifier:(int32_t)identifier replyToMid:(int32_t)replyToMid duration:(NSTimeInterval)duration configure:(void (^)(TGNotificationContentView *, bool *, TGBotReplyMarkup **))configure;
 
 @end
 
@@ -89,6 +95,8 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     
     TGNotificationWindow *_window;
     TGNotificationOverlayView *_overlayView;
+    
+    SMetaDisposable *_botCallbackDisposable;
 }
 
 @property (nonatomic, readonly) TGNotificationView *notificationView;
@@ -130,9 +138,12 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
 {
     if (_window == nil)
     {
+        
         _window = [[TGNotificationWindow alloc] initWithFrame:TGAppDelegateInstance.rootController.applicationBounds overInAppBrowser:[TGAppDelegateInstance.rootController.presentedViewController isKindOfClass:[SFSafariViewController class]]];
         _window.tag = 0xbeef;
-        _window.rootViewController = self;
+        _window.rootViewController = [[TGNotificationWindowViewController alloc] init];
+        [_window.rootViewController addChildViewController:self];
+        [_window.rootViewController.view addSubview:self.view];
         
         __weak TGNotificationController *weakSelf = self;
         _window.pointInside = ^bool(CGPoint point)
@@ -158,6 +169,7 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
 
 - (void)removeWindow
 {
+    self.view = nil;
     _window.rootViewController = nil;
     
     _window.hidden = true;
@@ -182,8 +194,20 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     [_overlayView addTarget:self action:@selector(overlayPressed) forControlEvents:UIControlEventTouchUpInside];
     [_wrapperView addSubview:_overlayView];
     
+    UIEdgeInsets safeAreaInset = [self calculatedSafeAreaInset];
+    safeAreaInset.top = safeAreaInset.top > FLT_EPSILON ? safeAreaInset.top - 20.0f : 0.0f;
+    
     __weak TGNotificationController *weakSelf = self;
     _notificationView = [[TGNotificationView alloc] initWithFrame:CGRectMake(0, 0, 0, TGNotificationDefaultHeight)];
+    _notificationView.safeAreaInset = safeAreaInset;
+    _notificationView.activateCommand = ^(id action, NSInteger index)
+    {
+        __strong TGNotificationController *strongSelf = weakSelf;
+        if (strongSelf == nil)
+            return;
+        
+        [strongSelf activateCommand:action index:index peerId:strongSelf->_currentItem.conversationId messageId:strongSelf->_currentItem.identifier];
+    };
     _notificationView.sendTextMessage = ^(NSString *text)
     {
         __strong TGNotificationController *strongSelf = weakSelf;
@@ -315,8 +339,8 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     [_wrapperView addSubview:_notificationView];
 }
 
-- (void)displayNotificationForConversation:(TGConversation *)conversation identifier:(int32_t)identifier replyToMid:(int32_t)replyToMid duration:(NSTimeInterval)duration configure:(void (^)(TGNotificationContentView *view, bool *isRepliable))configure
-{    
+- (void)displayNotificationForConversation:(TGConversation *)conversation identifier:(int32_t)identifier replyToMid:(int32_t)replyToMid duration:(NSTimeInterval)duration configure:(void (^)(TGNotificationContentView *view, bool *isRepliable, TGBotReplyMarkup **replyMarkup))configure
+{
     if (_currentItem.identifier == identifier)
         return;
     
@@ -372,8 +396,6 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     
     bool hasOverlayController = false;
     bool hasPlayerController = false;
-    bool hasWebAppController = false;
-    bool hasInstanPageController = false;
     for (UIWindow *window in [UIApplication sharedApplication].windows)
     {
         if ([window isKindOfClass:[TGOverlayControllerWindow class]] && window != _window)
@@ -409,7 +431,7 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
                     hasPlayerController = true;
                     break;
                 }
-            }
+             }
         }
         else if (iosMajorVersion() <= 7)
         {
@@ -424,20 +446,25 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
         }
     }
     
+    bool hasImportantController = false;
     for (TGViewController *controller in TGAppDelegateInstance.rootController.viewControllers)
     {
         if ([controller isKindOfClass:[TGWebAppController class]])
         {
-            hasWebAppController = true;
+            hasImportantController = true;
             break;
         }
         else if ([controller isKindOfClass:[TGInstantPageController class]]) {
-            hasInstanPageController = true;
+            hasImportantController = true;
+            break;
+        }
+        else if ([controller isKindOfClass:[TGPassportRequestController class]]) {
+            hasImportantController = true;
             break;
         }
     }
     
-    if (hasOverlayController || hasPlayerController || hasWebAppController || hasInstanPageController)
+    if (hasOverlayController || hasPlayerController || hasImportantController)
         return true;
     
     return false;
@@ -451,6 +478,11 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     TGModernConversationController *existingConversationController = nil;
     TGGenericModernConversationCompanion *existingConversationCompanion = nil;
     
+    if ([TGAppDelegateInstance.rootController.presentedViewController isKindOfClass:[TGGDPRNoticeController class]])
+    {
+        return false;
+    }
+    
     for (UIViewController *viewController in TGAppDelegateInstance.rootController.viewControllers)
     {
         if ([viewController isKindOfClass:[TGModernConversationController class]])
@@ -463,7 +495,7 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
             if ([lastController isKindOfClass:[TGMenuSheetController class]] && viewControllers.count > 2)
                 lastController = TGAppDelegateInstance.rootController.viewControllers[viewControllers.count - 2];
 
-            if (existingConversationCompanion.conversationId == conversation.conversationId && lastController == viewController)
+            if ((([existingConversationCompanion isKindOfClass:[TGFeedConversationCompanion class]] && TGPeerIdIsChannel(conversation.conversationId)) || existingConversationCompanion.conversationId == conversation.conversationId) && lastController == viewController)
             {
                 hasExistingConversationController = true;
                 break;
@@ -545,22 +577,24 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     
     bool isRepliable = false;
     bool isPresented = _notificationView.isPresented;
+    TGBotReplyMarkup *replyMarkup = nil;
     if (!isPresented)
     {
         if (![self isViewLoaded])
             [self loadView];
         
-        item.configure(_notificationView.contentView, &isRepliable);
+        item.configure(_notificationView.contentView, &isRepliable, &replyMarkup);
         [self _presentNotificationView];
     }
     else
     {
         [_notificationView prepareInterItemTransitionView];
         [_notificationView.contentView reset];
-        item.configure(_notificationView.contentView, &isRepliable);
+        item.configure(_notificationView.contentView, &isRepliable, &replyMarkup);
         [_notificationView playInterItemTransition];
     }
     
+    _notificationView.replyMarkup = replyMarkup;
     _notificationView.isRepliable = isRepliable;
     _overlayView.isTransparent = !isRepliable;
     
@@ -583,7 +617,7 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     
     void (^changeBlock)(void) = ^
     {
-        _notificationView.frame = CGRectOffset(_notificationView.frame, 0, -_notificationView.frame.size.height);
+        _notificationView.frame = CGRectOffset(_notificationView.frame, 0, -_notificationView.frame.size.height - MAX(0, _notificationView.frame.origin.y));
         _overlayView.alpha = 0.0f;
     };
     void (^finishBlock)(BOOL) = ^(__unused BOOL finished)
@@ -625,13 +659,13 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
     _notificationView.isPresented = true;
     _notificationView.frame = CGRectMake(0, -TGNotificationDefaultHeight, _wrapperView.frame.size.width, TGNotificationDefaultHeight);
     
+    UIEdgeInsets safeAreaInset = [self calculatedSafeAreaInset];
+    CGFloat inset = safeAreaInset.top > FLT_EPSILON ? safeAreaInset.top - 20.0f : 0.0f;
     [UIView animateWithDuration:0.35 delay:0.0 options:UIViewAnimationOptionCurveEaseInOut animations:^
     {
-        _notificationView.frame = CGRectMake(0, 0, _notificationView.frame.size.width, _notificationView.frame.size.height);
+        _notificationView.frame = CGRectMake(0, inset, _notificationView.frame.size.width, _notificationView.frame.size.height);
     } completion:^(__unused BOOL finished)
     {
-
-        
         if (iosMajorVersion() > 8)
         {
             [self _updateStatusBarHiding:true];
@@ -717,8 +751,12 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
  
     bool shouldShrink = ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone && UIInterfaceOrientationIsLandscape(toInterfaceOrientation));
     
+    UIEdgeInsets safeAreaInset = [self calculatedSafeAreaInset];
+    safeAreaInset.top = safeAreaInset.top > FLT_EPSILON ? safeAreaInset.top - 20.0f : 0.0f;
+    
+    CGFloat origin = safeAreaInset.top;
     CGFloat height = _notificationView.isExpanded && !shouldShrink ? [_notificationView expandedHeight] : [_notificationView shrinkedHeight];
-    _notificationView.frame = CGRectMake(0, _notificationView.frame.origin.y, _wrapperView.frame.size.width, height);
+    _notificationView.frame = CGRectMake(0, origin, _wrapperView.frame.size.width, height);
     [_notificationView setShrinked:shouldShrink];
 }
 
@@ -726,8 +764,16 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
 {
     [super viewWillLayoutSubviews];
     
-    _overlayView.center = self.view.center;
-    _notificationView.frame = CGRectMake(0, _notificationView.frame.origin.y, _wrapperView.frame.size.width, _notificationView.frame.size.height);
+    if (!_notificationView.isHiding)
+    {
+        UIEdgeInsets safeAreaInset = [self calculatedSafeAreaInset];
+        safeAreaInset.top = safeAreaInset.top > FLT_EPSILON ? safeAreaInset.top - 20.0f : 0.0f;
+        
+        CGFloat origin = safeAreaInset.top; // _notificationView.frame.origin.y;
+        _overlayView.center = self.view.center;
+        _notificationView.safeAreaInset = safeAreaInset;
+        _notificationView.frame = CGRectMake(0, origin, _wrapperView.frame.size.width, _notificationView.frame.size.height);
+    }
 }
 
 - (UIWindow *)window
@@ -758,7 +804,7 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
         for (TGCachedConversationMember *member in data.generalMembers)
             [chatParticipantsUids addObject:@(member.uid)];
         return chatParticipantsUids;
-    }] : [[[TGConversationSignals conversationWithPeerId:conversationId] filter:^bool(TGConversation *conversation)
+    }] : [[[TGConversationSignals conversationWithPeerId:conversationId full:true] filter:^bool(TGConversation *conversation)
     {
         return (conversation.chatParticipants != nil);
     }] map:^NSArray *(TGConversation *conversation)
@@ -865,6 +911,105 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
         
         return [TGStickersSignals preloadedStickerPreviews:@{ @"documents": matchedDocuments, @"associations": associations } count:6];
     }] deliverOn:[SQueue mainQueue]];
+}
+
+#pragma mark - Commands
+
+- (void)activateCommand:(id)action index:(NSInteger)__unused index peerId:(int64_t)peerId messageId:(int32_t)messageId
+{
+    if (_botCallbackDisposable == nil)
+        _botCallbackDisposable = [[SMetaDisposable alloc] init];
+    
+    if ([action isKindOfClass:[TGBotReplyMarkupButtonActionUrl class]]) {
+        NSString *url = ((TGBotReplyMarkupButtonActionUrl *)action).url;
+        if (url.length != 0) {
+            bool hiddenLink = true;
+            if (TGPeerIdIsUser(peerId)) {
+                TGUser *user = [TGDatabaseInstance() loadUser:(int32_t)peerId];
+                if (user.isVerified) {
+                    hiddenLink = false;
+                }
+            }
+            if (hiddenLink && ([url hasPrefix:@"http://telegram.me/"] || [url hasPrefix:@"http://t.me/"] || [url hasPrefix:@"https://telegram.me/"] || [url hasPrefix:@"https://t.me/"])) {
+                hiddenLink = false;
+            }
+            [self actionStageActionRequested:@"openLinkRequested" options:@{@"url": url, @"hidden": @(hiddenLink)}];
+        }
+    } else if ([action isKindOfClass:[TGBotReplyMarkupButtonActionCallback class]] || [action isKindOfClass:[TGBotReplyMarkupButtonActionGame class]]) {
+        int64_t accessHash = [TGDatabaseInstance() loadConversationWithId:peerId].accessHash;
+        if (messageId < TGMessageLocalMidBaseline) {
+            __weak TGNotificationController *weakSelf = self;
+            void (^accessAllowedBlock)() = ^{
+                __strong TGNotificationController *strongSelf = weakSelf;
+                if (strongSelf == nil) {
+                    return;
+                }
+                
+                NSData *actionData = nil;
+                bool isGame = false;
+                if ([action isKindOfClass:[TGBotReplyMarkupButtonActionCallback class]]) {
+                    actionData = ((TGBotReplyMarkupButtonActionCallback *)action).data;
+                } else if ([action isKindOfClass:[TGBotReplyMarkupButtonActionGame class]]) {
+                    isGame = true;
+                }
+                
+                SSignal *signal = [TGBotSignals botCallback:peerId accessHash:accessHash messageId:messageId data:actionData isGame:isGame];
+                [strongSelf->_botCallbackDisposable setDisposable:[[signal deliverOn:[SQueue mainQueue]] startWithNext:^(NSDictionary *result) {
+                    __strong TGNotificationController *strongSelf = weakSelf;
+                    if (strongSelf != nil) {
+                        NSString *url = result[@"url"];
+                        if (url.length != 0) {
+                            bool hiddenLink = true;
+                            if (TGPeerIdIsUser(peerId)) {
+                                TGUser *user = [TGDatabaseInstance() loadUser:(int32_t)peerId];
+                                if (user.isVerified) {
+                                    hiddenLink = false;
+                                }
+                            }
+                            [strongSelf actionStageActionRequested:@"openLinkRequested" options:@{@"url": url, @"hidden": @(hiddenLink)}];
+                        } else {
+                            NSString *text = result[@"text"];
+                            if ([text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].length != 0) {
+                                if ([result[@"alert"] boolValue]) {
+                                    [TGCustomAlertView presentAlertWithTitle:nil message:text cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
+                                }
+                            }
+                        }
+                    }
+                } error:^(__unused id error) {
+                    
+                } completed:nil]];
+            };
+            
+            if ([action isKindOfClass:[TGBotReplyMarkupButtonActionGame class]]) {
+                TGMessage *message = [TGDatabaseInstance() loadMessageWithMid:messageId peerId:peerId];
+                int32_t userId = (int32_t)message.fromUid;
+                for (id attachment in message.mediaAttachments) {
+                    if ([attachment isKindOfClass:[TGViaUserAttachment class]]) {
+                        userId = ((TGViaUserAttachment *)attachment).userId;
+                        break;
+                    }
+                }
+                TGUser *author = [TGDatabaseInstance() loadUser:userId];
+                
+                NSData *data = [TGDatabaseInstance() conversationCustomPropertySync:userId name:murMurHash32(@"botWebAccessAllowed")];
+                
+                if (data.length != 0 || author.isVerified) {
+                    accessAllowedBlock();
+                } else {
+                    [TGCustomAlertView presentAlertWithTitle:nil message:[NSString stringWithFormat:TGLocalized(@"Conversation.BotInteractiveUrlAlert"), author.displayName] cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:TGLocalized(@"Common.OK") completionBlock:^(bool okButtonPressed) {
+                        if (okButtonPressed) {
+                            int8_t one = 1;
+                            [TGDatabaseInstance() setConversationCustomProperty:userId name:murMurHash32(@"botWebAccessAllowed") value:[NSData dataWithBytes:&one length:1]];
+                            accessAllowedBlock();
+                        }
+                    }];
+                }
+            } else {
+                accessAllowedBlock();
+            }
+        }
+    }
 }
 
 #pragma mark - Media
@@ -983,6 +1128,10 @@ const NSUInteger TGNotificationExpandedTimeout = 60;
             }
         }
     }
+    
+    if (self.willPlayAudioAttachment != nil && isVoice)
+        self.willPlayAudioAttachment();
+    
     [TGTelegraphInstance.musicPlayer setPlaylist:[TGGenericPeerPlaylistSignals playlistForPeerId:peerId important:true atMessageId:messageId voice:isVoice] initialItemKey:@(messageId) metadata:@{@"peerId": @(peerId), @"voice": @(isVoice)}];
     
     [self hideAnimated:true];
@@ -1047,7 +1196,14 @@ static id mediaIdForAttachment(TGMediaAttachment *attachment)
             NSMutableDictionary *contentProperties = [[NSMutableDictionary alloc] initWithDictionary:message.contentProperties];
             contentProperties[@"contentsRead"] = [[TGMessageViewedContentProperty alloc] init];
             
-            TGDatabaseAction action = { .type = TGDatabaseActionReadMessageContents, .subject = message.mid, .arg0 = 0, .arg1 = 0};
+            int32_t convType = 0;
+            int32_t convPeerId = 0;
+            if (TGPeerIdIsChannel(message.cid)) {
+                convType = 1;
+                convPeerId = TGChannelIdFromPeerId(message.cid);
+            }
+            
+            TGDatabaseAction action = { .type = TGDatabaseActionReadMessageContents, .subject = message.mid, .arg0 = convPeerId, .arg1 = convType};
             [TGDatabaseInstance() storeQueuedActions:[NSArray arrayWithObject:[[NSValue alloc] initWithBytes:&action objCType:@encode(TGDatabaseAction)]]];
             [ActionStageInstance() requestActor:@"/tg/service/synchronizeactionqueue/(global)" options:nil watcher:TGTelegraphInstance];
             
@@ -1257,9 +1413,9 @@ static id mediaIdForAttachment(TGMediaAttachment *attachment)
 
 @implementation TGNotificationWindow
 
-- (instancetype)initWithFrame:(CGRect)frame overInAppBrowser:(bool)overInAppBrowser
+- (instancetype)initWithFrame:(CGRect)__unused frame overInAppBrowser:(bool)overInAppBrowser
 {
-    self = [super initWithFrame:frame];
+    self = [super initWithManager:[[TGLegacyComponentsContext shared] makeOverlayWindowManager] parentController:nil contentController:nil keepKeyboard:true];
     if (self != nil)
     {
         [self setHugeWindowLevel:!overInAppBrowser];
@@ -1275,7 +1431,7 @@ static id mediaIdForAttachment(TGMediaAttachment *attachment)
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
 {
-    TGNotificationController *controller = (TGNotificationController *)self.rootViewController;
+    TGNotificationController *controller = (TGNotificationController *)(self.rootViewController.childViewControllers.firstObject);
     
     CGPoint localPoint = [controller.view convertPoint:point fromView:self];
     UIView *result = [controller.view hitTest:localPoint withEvent:event];
@@ -1298,7 +1454,7 @@ static id mediaIdForAttachment(TGMediaAttachment *attachment)
 
 @implementation TGNotificationItem
 
-- (instancetype)initWithConversation:(TGConversation *)conversation identifier:(int32_t)identifier replyToMid:(int32_t)replyToMid duration:(NSTimeInterval)duration configure:(void (^)(TGNotificationContentView *, bool *))configure
+- (instancetype)initWithConversation:(TGConversation *)conversation identifier:(int32_t)identifier replyToMid:(int32_t)replyToMid duration:(NSTimeInterval)duration configure:(void (^)(TGNotificationContentView *, bool *, TGBotReplyMarkup **))configure
 {
     self = [super init];
     if (self != nil)

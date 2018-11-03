@@ -1,20 +1,20 @@
 #import "TGGalleryVideoPreviewDataSource.h"
 
-#import "ASQueue.h"
-#import "ActionStage.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/ASQueue.h>
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGWorkerPool.h"
 #import "TGWorkerTask.h"
 #import "TGMediaPreviewTask.h"
 
-#import "TGMemoryImageCache.h"
+#import <LegacyComponents/TGMemoryImageCache.h>
 
-#import "TGImageUtils.h"
-#import "TGStringUtils.h"
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 
-#import "TGImageBlur.h"
-#import "UIImage+TG.h"
+#import <LegacyComponents/TGImageBlur.h>
+#import <LegacyComponents/UIImage+TG.h>
 
 #import "TGMediaStoreContext.h"
 
@@ -92,33 +92,38 @@
             
             if (args[@"legacy-thumbnail-cache-url"] != nil && args[@"id"] != nil && args[@"messageId"] != nil && args[@"conversationId"] && args[@"legacy-thumbnail-cache-url"] != nil)
             {
-                [ActionStageInstance() requestActor:path options:@{
-                   @"isVideo": @true,
-                   @"mediaId": args[@"id"],
-                   @"messageId": args[@"messageId"],
-                   @"conversationId": args[@"conversationId"],
-                   @"uri": args[@"legacy-thumbnail-cache-url"],
-                   @"legacy-thumbnail-cache-url": args[@"legacy-thumbnail-cache-url"],
-                   @"completion": ^(bool success)
+                NSMutableDictionary *options = [[NSMutableDictionary alloc] initWithDictionary:@{
+                    @"isVideo": @true,
+                    @"mediaId": args[@"id"],
+                    @"messageId": args[@"messageId"],
+                    @"conversationId": args[@"conversationId"],
+                    @"uri": args[@"legacy-thumbnail-cache-url"],
+                    @"legacy-thumbnail-cache-url": args[@"legacy-thumbnail-cache-url"],
+                    @"completion": ^(bool success)
                     {
                         if (success)
                         {
                             dispatch_async([TGCache diskCacheQueue], ^
-                            {
-                                TGDataResource *result = [TGGalleryVideoPreviewDataSource _performLoad:uri isCancelled:nil];
-                                if (completion)
-                                    completion(result);
-                            });
+                                           {
+                                               TGDataResource *result = [TGGalleryVideoPreviewDataSource _performLoad:uri isCancelled:nil];
+                                               if (completion)
+                                                   completion(result);
+                                           });
                         }
                         else if (completion)
                             completion(nil);
                     },
-                   @"progress": ^(float value)
+                    @"progress": ^(float value)
                     {
                         if (progress)
                             progress(value);
                     }
-                } watcher:self];
+                }];
+                
+                if (args[@"origin_info"] != nil)
+                    options[@"originInfo"] = args[@"origin_info"];
+                
+                [ActionStageInstance() requestActor:path options:options watcher:self];
             }
         }
     }];

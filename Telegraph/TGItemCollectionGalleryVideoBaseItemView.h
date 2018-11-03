@@ -1,13 +1,15 @@
-#import "TGModernGalleryZoomableItemView.h"
+#import <LegacyComponents/TGModernGalleryZoomableItemView.h>
 
 @protocol TGPIPAblePlayerView;
 @class TGModernButton;
 @class TGModernGalleryVideoPlayerView;
 @class TGModernGalleryVideoScrubbingInterfaceView;
+@class TGModernGalleryPIPHeaderView;
 
 @interface TGItemCollectionGalleryVideoBaseItemView : TGModernGalleryZoomableItemView {
     TGModernButton *_actionButton;
     TGModernGalleryVideoPlayerView *_playerView;
+    TGModernGalleryPIPHeaderView *_pipHeaderView;
     TGModernGalleryVideoScrubbingInterfaceView *_scrubbingInterfaceView;
     bool _playerViewDetached;
     

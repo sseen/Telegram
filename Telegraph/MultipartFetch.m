@@ -1,5 +1,7 @@
 #import "MultipartFetch.h"
 
+#import <LegacyComponents/TGMediaOriginInfo.h>
+
 #import "TL/TLMetaScheme.h"
 #import "TGTelegramNetworking.h"
 #import "MediaBoxContexts.h"
@@ -8,9 +10,9 @@
 
 #import "TGNetworkWorker.h"
 
-#import <MTProtoKit/MTProtoKit.h>
+#import <MTProtoKit/MtProtoKit.h>
 
-#import "MediaBoxContexts.h"
+#import "TGDownloadMessagesSignal.h"
 
 @interface MultipartFetchRequestData : NSObject
     
@@ -67,6 +69,7 @@
     
     void (^_partReady)(NSData *);
     void (^_completed)();
+    void (^_failed)();
     
     NSMutableDictionary<NSNumber *, MultipartPendingPart *> *_fetchingParts;
     NSMutableDictionary<NSNumber *, NSData *> *_fetchedParts;
@@ -74,15 +77,20 @@
     SVariable *_requestData;
     bool _switchedToCdn;
     bool _reuploadedToCdn;
+    bool _updatedFileReference;
     
     SMetaDisposable *_reuploadToCdnDisposable;
+    SMetaDisposable *_partHashesDisposable;
+    SMetaDisposable *_fileReferenceDisposable;
+    
+    NSDictionary *_cdnFilePartHashes;
 }
 
 @end
 
 @implementation MultipartFetchManager
 
-- (instancetype)initWithResource:(id<TelegramCloudMediaResource>)resource mediaTypeTag:(TGNetworkMediaTypeTag)mediaTypeTag size:(NSNumber *)size range:(NSRange)range partReady:(void (^)(NSData *))partReady completed:(void (^)())completed {
+- (instancetype)initWithResource:(id<TelegramCloudMediaResource>)resource mediaTypeTag:(TGNetworkMediaTypeTag)mediaTypeTag size:(NSNumber *)size range:(NSRange)range partReady:(void (^)(NSData *))partReady completed:(void (^)())completed failed:(void (^)())failed {
     self = [super init];
     if (self != nil) {
         _defaultPartSize = 128 * 1024;
@@ -105,8 +113,11 @@
         _committedOffset = (int32_t)range.location;
         _partReady = [partReady copy];
         _completed = [completed copy];
+        _failed = [failed copy];
         
         _reuploadToCdnDisposable = [[SMetaDisposable alloc] init];
+        _partHashesDisposable = [[SMetaDisposable alloc] init];
+        _fileReferenceDisposable = [[SMetaDisposable alloc] init];
         
         _requestData = [[SVariable alloc] init];
         [_requestData set:[[SSignal combineSignals:@[[[TGTelegramNetworking instance] downloadWorkerForDatacenterId:[resource datacenterId] type:_mediaTypeTag], [SSignal single:[resource apiInputLocation]]]] map:^id(NSArray *values) {
@@ -128,6 +139,8 @@
             [part.disposable dispose];
         }
         [_reuploadToCdnDisposable dispose];
+        [_partHashesDisposable dispose];
+        [_fileReferenceDisposable dispose];
     }];
 }
 
@@ -137,6 +150,32 @@
             NSData *data = _fetchedParts[nOffset];
             _committedOffset += (int32_t)data.length;
             [_fetchedParts removeObjectForKey:nOffset];
+            
+            if (_cdnFilePartHashes != nil) {
+                NSData *dataToWrite = data;
+                int32_t basePartOffset = [nOffset intValue];
+                for (int32_t localOffset = 0; localOffset < (int32_t)dataToWrite.length; localOffset += 128 * 1024) {
+                    int32_t partOffset = basePartOffset + localOffset;
+                    NSData *hashData = _cdnFilePartHashes[@(partOffset)];
+                    if (hashData == nil) {
+                        TGLog(@"File CDN part hash missing at %d", partOffset);
+                        _failed();
+                        return;
+                    }
+                    NSData *localHash = nil;
+                    if (partOffset + 128 * 1024 > (int32_t)dataToWrite.length) {
+                        localHash = MTSha256([[NSData alloc] initWithBytesNoCopy:(void *)dataToWrite.bytes + localOffset length:(int32_t)dataToWrite.length - localOffset freeWhenDone:false]);
+                    } else {
+                        localHash = MTSha256([[NSData alloc] initWithBytesNoCopy:(void *)dataToWrite.bytes + localOffset length:128 * 1024 freeWhenDone:false]);
+                    }
+                    if (![localHash isEqual:hashData]) {
+                        TGLog(@"File CDN part hash mismatch at %d", partOffset);
+                        _failed();
+                        return;
+                    }
+                }
+            }
+            
             _partReady(data);
         }
     }
@@ -220,7 +259,7 @@
             return [SSignal never];
         }
         
-        return [[[[TGTelegramNetworking instance] requestSignal:requestRpc worker:requestData.worker] deliverOn:queue] mapToSignal:^SSignal *(id next) {
+        return [[[[[TGTelegramNetworking instance] requestSignal:requestRpc worker:requestData.worker] deliverOn:queue] mapToSignal:^SSignal *(id next) {
             __strong MultipartFetchManager *strongSelf = weakSelf;
             if (strongSelf != nil) {
                 if ([next isKindOfClass:[TLupload_File$upload_file class]]) {
@@ -250,8 +289,102 @@
             } else {
                 return [SSignal complete];
             }
+        }] catch:^SSignal *(id error) {
+            int32_t errorCode = [[TGTelegramNetworking instance] extractNetworkErrorCode:error];
+            NSString *errorText = [[TGTelegramNetworking instance] extractNetworkErrorType:error];
+            
+            if ([errorText hasPrefix:@"FILE_REFERENCE_"] && errorCode == 400 && [requestData.data isKindOfClass:[TLInputFileLocation class]]) {
+                __strong MultipartFetchManager *strongSelf = weakSelf;
+                if (strongSelf != nil) {
+                    [strongSelf updateFileReferenceWithFileLocation:(TLInputFileLocation *)requestData.data originInfo:strongSelf->_resource.originInfo];
+                }
+                return [SSignal never];
+            } else {
+                return [SSignal fail:error];
+            }
         }];
     }] take:1];
+}
+
+- (void)updateFileReferenceWithFileLocation:(TLInputFileLocation *)location originInfo:(TGMediaOriginInfo *)originInfo {
+    if (_updatedFileReference) {
+        return;
+    }
+    
+    _updatedFileReference = true;
+    
+    __weak MultipartFetchManager *weakSelf = self;
+    [_fileReferenceDisposable setDisposable:[[[TGDownloadMessagesSignal updatedOriginInfo:originInfo identifier:_resource.identifier] deliverOn:_queue] startWithNext:^(TGMediaOriginInfo *next)
+    {
+        __strong MultipartFetchManager *strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            strongSelf->_updatedFileReference = false;
+            
+            TLInputFileLocation *updatedLocation = nil;
+            if ([location isKindOfClass:[TLInputFileLocation$inputDocumentFileLocation class]]) {
+                TLInputFileLocation$inputDocumentFileLocation *documentFileLocation = (TLInputFileLocation$inputDocumentFileLocation *)location;
+                documentFileLocation.file_reference = [next fileReference];
+                updatedLocation = documentFileLocation;
+            } else if ([location isKindOfClass:[TLInputFileLocation$inputFileLocation class]]) {
+                TLInputFileLocation$inputFileLocation *fileLocation = (TLInputFileLocation$inputFileLocation *)location;
+                fileLocation.file_reference = [next fileReferenceForVolumeId:fileLocation.volume_id localId:fileLocation.local_id];
+                updatedLocation = fileLocation;
+            }
+            
+            [strongSelf->_requestData set:[[SSignal combineSignals:@[[[TGTelegramNetworking instance] downloadWorkerForDatacenterId:[strongSelf->_resource datacenterId] type:strongSelf->_mediaTypeTag isCdn:false], [SSignal single:updatedLocation]]] map:^id(NSArray *values) {
+                return [[MultipartFetchRequestData alloc] initWithWorker:values[0] data:values[1]];
+            }]];
+        }
+    } error:nil completed:nil]];
+}
+
+- (void)switchToCdnWithFileData:(TGCdnFileData *)fileData partHashes:(NSDictionary *)partHashes {
+    NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+    if (partHashes != nil) {
+        [dict addEntriesFromDictionary:partHashes];
+    }
+    int32_t maxOffset = 0;
+    for (NSNumber *nOffset in dict.keyEnumerator) {
+        maxOffset = MAX(maxOffset, [nOffset intValue] + 128 * 1024);
+    }
+    if (_completeSize != nil && maxOffset < [_completeSize intValue]) {
+        if (_partHashesDisposable == nil) {
+            _partHashesDisposable = [[SMetaDisposable alloc] init];
+        }
+        __weak MultipartFetchManager *weakSelf = self;
+        
+        SQueue *queue = _queue;
+        [_partHashesDisposable setDisposable:[[[[TGTelegramNetworking instance] downloadWorkerForDatacenterId:[_resource datacenterId] type:TGNetworkMediaTypeTagGeneric] mapToSignal:^SSignal *(TGNetworkWorkerGuard *worker) {
+            TLRPCupload_getCdnFileHashes$upload_getCdnFileHashes *getCdnFileHashes = [[TLRPCupload_getCdnFileHashes$upload_getCdnFileHashes alloc] init];
+            getCdnFileHashes.file_token = fileData.token;
+            getCdnFileHashes.offset = maxOffset;
+            return [[TGTelegramNetworking instance] requestSignal:getCdnFileHashes worker:worker];
+        }] startWithNext:^(NSArray *hashes) {
+            [queue dispatch:^{
+                __strong MultipartFetchManager *strongSelf = weakSelf;
+                if (strongSelf != nil) {
+                    for (TLFileHash$fileHash *nHash in hashes) {
+                        dict[@(nHash.offset)] = nHash.n_hash;
+                    }
+                    
+                    int32_t maxOffset = 0;
+                    for (NSNumber *nOffset in dict.keyEnumerator) {
+                        maxOffset = MAX(maxOffset, [nOffset intValue] + 128 * 1024);
+                    }
+                    
+                    if (strongSelf->_completeSize != nil && maxOffset < [strongSelf->_completeSize intValue]) {
+                        [strongSelf switchToCdnWithFileData:fileData partHashes:dict];
+                    } else {
+                        strongSelf->_cdnFilePartHashes = dict;
+                        [strongSelf switchToCdn:fileData];
+                    }
+                }
+            }];
+        } error:nil completed:nil]];
+    } else {
+        _cdnFilePartHashes = dict;
+        [self switchToCdn:fileData];
+    }
 }
     
 - (void)switchToCdn:(TGCdnFileData *)fileData {
@@ -302,6 +435,7 @@ SSignal *multipartFetch(id<TelegramCloudMediaResource> resource, NSNumber *size,
         } completed:^{
             [subscriber putNext:[[MediaResourceDataFetchResult alloc] initWithData:[NSData data] complete:true]];
             [subscriber putCompletion];
+        } failed:^{
         }];
         
         [manager start];

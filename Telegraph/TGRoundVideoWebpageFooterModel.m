@@ -1,6 +1,6 @@
 #import "TGRoundVideoWebpageFooterModel.h"
 
-#import "TGWebPageMediaAttachment.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGModernTextViewModel.h"
 #import "TGSignalImageViewModel.h"
@@ -11,9 +11,6 @@
 #import "TGRoundMessageRingViewModel.h"
 #import "TGRoundMessageTimeViewModel.h"
 
-#import "TGFont.h"
-#import "TGImageUtils.h"
-
 #import "TGSharedMediaUtils.h"
 #import "TGSharedMediaSignals.h"
 #import "TGSharedPhotoSignals.h"
@@ -21,26 +18,22 @@
 
 #import "TGReusableLabel.h"
 
-#import "TGMessage.h"
-
-#import "TGImageManager.h"
+#import <LegacyComponents/TGImageManager.h>
 
 #import "TGPreparedLocalDocumentMessage.h"
 #import "TGTelegraph.h"
 
-#import "TGViewController.h"
-
 #import "TGAppDelegate.h"
 
-#import "TGTextCheckingResult.h"
-
-#import "TGAnimationUtils.h"
+#import <LegacyComponents/TGAnimationUtils.h>
 
 #import "TGSignalImageView.h"
 
 #import "TGTelegraphConversationMessageAssetsSource.h"
 
 #import "TGVideoMessagePIPController.h"
+
+#import "TGPresentation.h"
 
 @interface TGRoundVideoWebpageFooterModel ()
 {
@@ -105,7 +98,7 @@ static UIFont *durationFont()
         if (webPage.siteName.length != 0)
         {
             _siteModel = [[TGModernTextViewModel alloc] initWithText:webPage.siteName font:titleFont()];
-            _siteModel.textColor = [TGWebpageFooterModel colorForAccentText:incoming];
+            _siteModel.textColor = incoming ? context.presentation.pallete.chatIncomingAccentColor : context.presentation.pallete.chatOutgoingAccentColor;
             [self addSubmodel:_siteModel];
         }
         
@@ -126,7 +119,7 @@ static UIFont *durationFont()
             _titleModel = [[TGModernTextViewModel alloc] initWithText:title font:titleFont()];
             _titleModel.layoutFlags = TGReusableLabelLayoutMultiline;
             _titleModel.maxNumberOfLines = 4;
-            _titleModel.textColor = [UIColor blackColor];
+            _titleModel.textColor = incoming ? context.presentation.pallete.chatIncomingTextColor : context.presentation.pallete.chatOutgoingTextColor;
             [self addSubmodel:_titleModel];
         }
         
@@ -174,7 +167,7 @@ static UIFont *durationFont()
                 }
             };
             
-            CGFloat radius = 100.0f * TGScreenScaling();
+            CGFloat radius = 100.0f;
             [_imageViewModel setSignalGenerator:^SSignal *{
                 return [TGSharedFileSignals squareFileThumbnail:webPage.document ofSize:imageSize threadPool:[TGSharedMediaUtils sharedMediaImageProcessingThreadPool] memoryCache:[TGSharedMediaUtils sharedMediaMemoryImageCache] pixelProcessingBlock:[TGSharedMediaSignals pixelProcessingBlockForRoundCornersOfRadius:radius]];
             } identifier:key];
@@ -198,13 +191,7 @@ static UIFont *durationFont()
             _ringModel.viewUserInteractionDisabled = true;
             [self addSubmodel:_ringModel];
             
-            UIColor *labelColor = nil;
-            if (incoming) {
-                labelColor = UIColorRGBA(0x525252, 0.6f);
-            } else {
-                labelColor = UIColorRGBA(0x008c09, 0.8f);
-            }
-            
+            UIColor *labelColor = incoming ? context.presentation.pallete.chatIncomingSubtextColor : context.presentation.pallete.chatOutgoingSubtextColor;            
             _durationLabelModel = [[TGRoundMessageTimeViewModel alloc] initWithFont:durationFont() textColor:labelColor];
             [_durationLabelModel layoutForContainerSize:CGSizeMake(200.0f, 200.0f)];
             [self addSubmodel:_durationLabelModel];

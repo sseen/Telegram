@@ -1,40 +1,40 @@
 #import "TGInstantPageController.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
+#import "TGLegacyComponentsContext.h"
+
 #import <SafariServices/SafariServices.h>
 
 #import "TGInstantPageControllerView.h"
 #import "TGTelegraph.h"
 #import "TGApplication.h"
 #import "TGAppDelegate.h"
-#import "TGHacks.h"
 #import "TGDatabase.h"
 
-#import "TGModernGalleryController.h"
+#import "TGPresentation.h"
+
+#import <LegacyComponents/TGModernGalleryController.h>
 #import "TGItemCollectionGalleryModel.h"
-#import "TGOverlayControllerWindow.h"
 #import "TGItemCollectionGalleryItem.h"
 
 #import "TGItemCollectionGalleryVideoItemView.h"
 
-#import "TGEmbedPlayerView.h"
+#import <LegacyComponents/TGEmbedPlayerView.h>
 #import "TGEmbedPlayerController.h"
 #import "TGEmbedPIPController.h"
 #import "TGEmbedPIPPlaceholderView.h"
 
-#import "TGActionSheet.h"
+#import "TGCustomActionSheet.h"
 #import "TGOpenInMenu.h"
 #import "TGShareMenu.h"
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 #import "TGCallStatusBarView.h"
 #import "TGSendMessageSignals.h"
 #import "TGChannelManagementSignals.h"
 
 #import "TGSendMessageSignals.h"
 #import "TGWebpageSignals.h"
-
-#import "TGNavigationBar.h"
-
-#import "TGStringUtils.h"
 
 #import "TGGenericPeerPlaylistSignals.h"
 
@@ -58,6 +58,7 @@
     
     TGPIPSourceLocation *_targetPIPLocation;
     NSString *_initialAnchor;
+    bool _initiallyHidden;
     
     bool _autoNightEnabled;
     NSCalendar *_calendar;
@@ -78,20 +79,42 @@
         _shareDisposable = [[SMetaDisposable alloc] init];
         _openWebpageDisposable = [[SMetaDisposable alloc] init];
         _joinChannelDisposable = [[SMetaDisposable alloc] init];
-        _initialAnchor = anchor;
         
-        __weak TGInstantPageController *weakSelf = self;
-        _updatePageDisposable = [[[TGWebpageSignals updatedWebpage:webPage] deliverOn:[SQueue mainQueue]] startWithNext:^(TGWebPageMediaAttachment *updatedWebPage) {
-            __strong TGInstantPageController *strongSelf = weakSelf;
-            if (strongSelf != nil) {
-                strongSelf->_webPage = updatedWebPage;
-                if (strongSelf->_pageView != nil) {
-                    [strongSelf->_pageView setWebPage:updatedWebPage];
-                }
+        TGProgressWindow *progressWindow = nil;
+        if (anchor.length > 0) {
+            if (!webPage.instantPage.isPartial || [anchor isEqualToString:@"general"]) {
+                _initialAnchor = anchor;
+            } else {
+                _initiallyHidden = true;
+                progressWindow = [[TGProgressWindow alloc] init];
+                [progressWindow showWithDelay:0.2];
             }
-        }];
+        }
         
-        _initialState = [TGDatabaseInstance() loadInstantPageScrollState:webPage.webPageId];
+        if (TGTelegraphInstance.clientUserId != 0)
+        {
+            __weak TGInstantPageController *weakSelf = self;
+            _updatePageDisposable = [[[TGWebpageSignals updatedWebpage:webPage] deliverOn:[SQueue mainQueue]] startWithNext:^(TGWebPageMediaAttachment *updatedWebPage) {
+                __strong TGInstantPageController *strongSelf = weakSelf;
+                if (strongSelf != nil && updatedWebPage.instantPage != nil) {
+                    strongSelf->_webPage = updatedWebPage;
+                    if (strongSelf->_pageView != nil) {
+                        [strongSelf->_pageView setWebPage:updatedWebPage];
+                        if (progressWindow != nil) {
+                            [strongSelf->_pageView setInitialAnchor:anchor];
+                            [progressWindow dismiss:true];
+                            [strongSelf->_pageView setContentHidden:false animated:true];
+                        }
+                    }
+                }
+            }];
+            
+            _initialState = [TGDatabaseInstance() loadInstantPageScrollState:webPage.webPageId];
+        }
+        else
+        {
+            [_pageView setWebPage:webPage];
+        }
     }
     return self;
 }
@@ -113,13 +136,18 @@
     
     _pageView = [[TGInstantPageControllerView alloc] initWithFrame:self.view.bounds];
     _pageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    _pageView.disableActions = self.disableActions;
     _pageView.peerId = _peerId;
     _pageView.messageId = _messageId;
+    _pageView.safeAreaInset = self.controllerSafeAreaInset;
     _pageView.autoNightThemeEnabled = _autoNightEnabled;
     [self processThemeChangeAnimated:false];
     _pageView.webPage = _webPage;
     _pageView.statusBarHeight = [self controllerStatusBarHeight];
     _pageView.initialAnchor = _initialAnchor;
+    if (_initiallyHidden) {
+        [_pageView setContentHidden:true animated:false];
+    }
     [self.view addSubview:_pageView];
     
     __weak TGInstantPageController *weakSelf = self;
@@ -149,7 +177,16 @@
                     __strong TGInstantPageController *strongSelf = weakSelf;
                     if (strongSelf != nil) {
                         if (webPage != nil) {
-                            [TGAppDelegateInstance.rootController pushContentController:[[TGInstantPageController alloc] initWithWebPage:webPage anchor:[url urlAnchorPart] peerId:0 messageId:0]];
+                            TGInstantPageController *controller = [[TGInstantPageController alloc] initWithWebPage:webPage anchor:[url urlAnchorPart] peerId:0 messageId:0];
+                            controller.disableActions = strongSelf.disableActions;
+                            if ([TGAppDelegateInstance.rootController.presentedViewController isKindOfClass:[TGNavigationController class]])
+                            {
+                                [(TGNavigationController *)TGAppDelegateInstance.rootController.presentedViewController pushViewController:controller animated:true];
+                            }
+                            else
+                            {
+                                [TGAppDelegateInstance.rootController pushContentController:controller];
+                            }
                         } else {
                             [(TGApplication *)[UIApplication sharedApplication] openURL:[NSURL URLWithString:url] forceNative:false keepStack:true];
                         }
@@ -161,13 +198,16 @@
                     }
                 } completed:nil]];
             } else {
-                [(TGApplication *)[UIApplication sharedApplication] openURL:[NSURL URLWithString:url] forceNative:false keepStack:true];
+                [(TGApplication *)[UIApplication sharedApplication] openURL:[NSURL URLWithString:url] forceNative:strongSelf->_disableActions keepStack:true];
             }
         }
     };
     _pageView.openUrlOptions = ^(NSString *url, __unused int64_t webpageId) {
         __strong TGInstantPageController *strongSelf = weakSelf;
         if (strongSelf != nil) {
+            if (url.length == 0)
+                return;
+            
             NSURL *link = [NSURL URLWithString:url];
             bool useOpenIn = false;
             bool isWeblink = false;
@@ -180,9 +220,15 @@
             
             NSMutableArray *actions = [[NSMutableArray alloc] init];
             if (useOpenIn)
-                [actions addObject:[[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Conversation.FileOpenIn") action:@"openIn"]];
+            {
+                TGActionSheetAction *openInAction = [[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Conversation.FileOpenIn") action:@"openIn"];
+                openInAction.disableAutomaticSheetDismiss = true;
+                [actions addObject:openInAction];
+            }
             else
+            {
                 [actions addObject:[[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Conversation.LinkDialogOpen") action:@"open"]];
+            }
             [actions addObject:[[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Conversation.LinkDialogCopy") action:@"copy"]];
             
             [actions addObject:[[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Conversation.ContextMenuShare") action:@"share"]];
@@ -193,7 +239,7 @@
             [actions addObject:[[TGActionSheetAction alloc] initWithTitle:TGLocalized(@"Common.Cancel") action:@"cancel" type:TGActionSheetActionTypeCancel]];
             
             NSString *displayString = url;
-            TGActionSheet *actionSheet = [[TGActionSheet alloc] initWithTitle:displayString.length < 70 ? displayString : [[displayString substringToIndex:70] stringByAppendingString:@"..."] actions:actions actionBlock:^(__unused TGInstantPageController *controller, NSString *action)
+            TGCustomActionSheet *actionSheet = [[TGCustomActionSheet alloc] initWithTitle:displayString.length < 70 ? displayString : [[displayString substringToIndex:70] stringByAppendingString:@"..."] actions:actions menuController:nil advancedActionBlock:^(TGMenuSheetController *menuController, __unused TGInstantPageController *controller, NSString *action)
             {
                 if ([action isEqualToString:@"open"])
                 {
@@ -201,7 +247,7 @@
                 }
                 else if ([action isEqualToString:@"openIn"])
                 {
-                    [TGOpenInMenu presentInParentController:strongSelf menuController:nil title:TGLocalized(@"Map.OpenIn") url:link buttonTitle:nil buttonAction:nil sourceView:strongSelf.view sourceRect:nil barButtonItem:nil];
+                    [TGOpenInMenu presentInParentController:strongSelf menuController:menuController title:TGLocalized(@"Map.OpenIn") url:link buttonTitle:nil buttonAction:nil sourceView:strongSelf.view sourceRect:nil barButtonItem:nil];
                 }
                 else if ([action isEqualToString:@"copy"])
                 {
@@ -250,8 +296,22 @@
     _pageView.openMedia = ^(NSArray<TGInstantPageMedia *> *medias, TGInstantPageMedia *centralMedia) {
         __strong TGInstantPageController *strongSelf = weakSelf;
         if (strongSelf != nil) {
-            TGModernGalleryController *galleryController = [[TGModernGalleryController alloc] init];
+            TGModernGalleryController *galleryController = [[TGModernGalleryController alloc] initWithContext:[TGLegacyComponentsContext shared]];
             TGItemCollectionGalleryModel *model = [[TGItemCollectionGalleryModel alloc] initWithMedias:medias centralMedia:centralMedia];
+            __weak TGModernGalleryController *weakGallery = galleryController;
+            model.openLinkRequested = ^(NSString *url)
+            {
+                __strong TGInstantPageController *strongSelf = weakSelf;
+                if (strongSelf != nil)
+                {
+                    if (strongSelf->_pageView != nil)
+                        strongSelf->_pageView.openUrl(url, 0);
+                    
+                    __strong TGModernGalleryController *strongGallery = weakGallery;
+                    if (strongGallery != nil)
+                        [strongGallery dismissWhenReadyAnimated:true];
+                }
+            };
             galleryController.model = model;
             galleryController.asyncTransitionIn = true;
             galleryController.defaultStatusBarStyle = UIStatusBarStyleLightContent;
@@ -363,7 +423,7 @@
                 }
             };
             
-            TGOverlayControllerWindow *controllerWindow = [[TGOverlayControllerWindow alloc] initWithParentController:strongSelf contentController:galleryController];
+            TGOverlayControllerWindow *controllerWindow = [[TGOverlayControllerWindow alloc] initWithManager:[[TGLegacyComponentsContext shared] makeOverlayWindowManager] parentController:strongSelf contentController:galleryController];
             controllerWindow.hidden = false;
         }
     };
@@ -450,12 +510,18 @@
     _pageView.openChannel = ^(TGConversation *channel) {
         __strong TGInstantPageController *strongSelf = weakSelf;
         if (strongSelf != nil) {
+            if (strongSelf.disableActions)
+                return;
+            
             [ActionStageInstance() requestActor:[[NSString alloc] initWithFormat:@"/resolveDomain/(%@,profile)", channel.username] options:@{@"domain": channel.username, @"profile": @true, @"keepStack": @true} flags:0 watcher:TGTelegraphInstance];
         }
     };
     _pageView.joinChannel = ^(TGConversation *channel) {
         __strong TGInstantPageController *strongSelf = weakSelf;
         if (strongSelf != nil) {
+            if (strongSelf.disableActions)
+                return;
+            
             SSignal *channelSignal = [SSignal defer:^SSignal *{
                 bool exists = [TGDatabaseInstance() _channelExists:channel.conversationId] || channel.accessHash != 0;
                 if (exists)
@@ -504,6 +570,12 @@
         if (strongSelf != nil) {
             [strongSelf storeAutoNightTheme:enabled];
             [strongSelf processThemeChangeAnimated:true];
+        }
+    };
+    _pageView.openInPressed = ^{
+        __strong TGInstantPageController *strongSelf = weakSelf;
+        if (strongSelf != nil) {
+            [(TGApplication *)[TGApplication sharedApplication] nativeOpenURL:[NSURL URLWithString:strongSelf->_webPage.url]];
         }
     };
     
@@ -611,19 +683,46 @@
     self.navigationController.navigationBar.alpha = 0.0f;
 }
 
+- (void)controllerInsetUpdated:(UIEdgeInsets)previousInset
+{
+    UIInterfaceOrientation orientation = self.interfaceOrientation;
+    CGFloat defaultStatusBarHeight = !TGIsPad() && iosMajorVersion() >= 11 && UIInterfaceOrientationIsLandscape(orientation) ? 0.0f : 20.0f;
+    CGFloat statusBarHeight = !UIEdgeInsetsEqualToEdgeInsets(self.controllerSafeAreaInset, UIEdgeInsetsZero) ? self.controllerSafeAreaInset.top : defaultStatusBarHeight;
+    _pageView.statusBarHeight = statusBarHeight;
+    _pageView.safeAreaInset = self.controllerSafeAreaInset;
+    
+    [super controllerInsetUpdated:previousInset];
+}
+
+- (void)setDisableActions:(bool)disableActions
+{
+    _disableActions = disableActions;
+    
+    _pageView.disableActions = disableActions;
+}
+
 - (void)setStatusBarAlpha:(CGFloat)alpha {
-    [TGHacks setApplicationStatusBarAlpha:alpha];
+    if ([TGViewController hasTallScreen])
+        return;
+    
+    [[TGLegacyComponentsContext shared] setApplicationStatusBarAlpha:alpha];
     [TGAppDelegateInstance.rootController.callStatusBarView setAlpha:alpha];
 }
 
 - (void)setStatusBarOffset:(CGFloat)offset {
+    if ([TGViewController hasTallScreen])
+        return;
+    
     [TGHacks setApplicationStatusBarOffset:offset];
     [TGAppDelegateInstance.rootController.callStatusBarView setOffset:offset];
 }
 
 - (bool)_updateControllerInsetForOrientation:(UIInterfaceOrientation)orientation force:(bool)force notify:(bool)notify {
     bool result = [super _updateControllerInsetForOrientation:orientation force:force notify:notify];
-    _pageView.statusBarHeight = [self controllerStatusBarHeight];
+    
+    CGFloat defaultStatusBarHeight = !TGIsPad() && iosMajorVersion() >= 11 && UIInterfaceOrientationIsLandscape(orientation) ? 0.0f : 20.0f;
+    CGFloat statusBarHeight = !UIEdgeInsetsEqualToEdgeInsets(self.controllerSafeAreaInset, UIEdgeInsetsZero) ? self.controllerSafeAreaInset.top : defaultStatusBarHeight;
+    _pageView.statusBarHeight = statusBarHeight;
     return result;
 }
 
@@ -642,20 +741,17 @@
         [progressWindow showWithDelay:0.1];
         
         NSString *text = strongSelf->_webPage.url;
-        if (caption.length != 0) {
-            text = [[text stringByAppendingString:@"\n"] stringByAppendingString:caption];
-        }
         
         NSMutableArray *signals = [[NSMutableArray alloc] init];
         for (NSNumber *nPeerId in peerIds) {
-            [signals addObject:[TGSendMessageSignals sendTextMessageWithPeerId:[nPeerId longLongValue] text:text replyToMid:0]];
+            SSignal *signal = [TGSendMessageSignals sendTextMessageWithPeerId:[nPeerId longLongValue] text:text replyToMid:0];
+            if (caption.length != 0) {
+                signal = [[TGSendMessageSignals sendTextMessageWithPeerId:[nPeerId longLongValue] text:caption replyToMid:0] then:signal];
+            }
+            [signals addObject:signal];
         }
         
-        NSMutableArray *captionSignals = [[NSMutableArray alloc] init];
-        
-        SSignal *combined = [[SSignal combineSignals:signals] then:[SSignal combineSignals:captionSignals]];
-        
-        [strongSelf->_shareDisposable setDisposable:[[[combined deliverOn:[SQueue mainQueue]] onDispose:^{
+        [strongSelf->_shareDisposable setDisposable:[[[[SSignal combineSignals:signals] deliverOn:[SQueue mainQueue]] onDispose:^{
             TGDispatchOnMainThread(^{
                 [progressWindow dismiss:true];
             });
@@ -721,6 +817,9 @@
 }
 
 - (bool)presentationAutoNightTheme {
+    if (iosMajorVersion() >= 11 && UIAccessibilityIsInvertColorsEnabled())
+        return false;
+    
     NSNumber *storedAutoNightTheme = [[NSUserDefaults standardUserDefaults] objectForKey:@"instantPage_autoNightTheme_v0"];
     if (storedAutoNightTheme) {
         return storedAutoNightTheme.boolValue;
@@ -729,9 +828,12 @@
 }
 
 - (bool)isDarkTimeOfDay {
-    if (_calendar == nil) {
+    NSNumber *value = [TGPresentation isAutoNightActivated];
+    if (value != nil)
+        return value.boolValue;
+    
+    if (_calendar == nil)
         _calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
-    }
     
     NSDateComponents *dateComponents = [_calendar components:NSCalendarUnitHour fromDate:[NSDate date]];
     return dateComponents.hour >= 22 || dateComponents.hour <= 6;

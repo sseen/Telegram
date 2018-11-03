@@ -11,6 +11,7 @@
 #import "TGMessageRange.h"
 
 @class TGModernViewStorage;
+@class TGPresentation;
 
 @interface TGModernConversationCollectionView : UICollectionView
 
@@ -19,11 +20,12 @@
 
 - (void)scrollToTopIfNeeded;
 
-- (void)setDelayVisibleItemsUpdate:(bool)delay;
 - (void)updateVisibleItemsNow;
 - (bool)disableDecorationViewUpdates;
 - (void)setDisableDecorationViewUpdates:(bool)disableDecorationViewUpdates;
 - (bool)updateRelativeBounds;
+
+- (void)setDimmed:(bool)dimmed frontCells:(NSArray *)frontCells animated:(bool)animated;
 
 - (UIView *)viewForDecorationAtIndex:(int)index;
 - (NSArray *)visibleDecorations;
@@ -34,11 +36,13 @@
 
 - (CGFloat)implicitTopInset;
 - (void)updateHeaderView;
+- (void)updatePresentation;
 
 @end
 
 @protocol TGModernConversationCollectionViewDelegate <UICollectionViewDelegate>
 
 - (TGModernViewStorage *)viewStorage;
+- (TGPresentation *)presentation;
 
 @end

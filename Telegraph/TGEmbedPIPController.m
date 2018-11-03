@@ -1,6 +1,9 @@
 #import "TGEmbedPIPController.h"
+
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGEmbedPIPView.h"
-#import "TGPIPAblePlayerView.h"
+#import <LegacyComponents/TGPIPAblePlayerView.h>
 
 #import <AVKit/AVKit.h>
 #import <MediaPlayer/MediaPlayer.h>
@@ -8,12 +11,9 @@
 #import "TGEmbedPIPPlaceholderView.h"
 #import "TGEmbedItemView.h"
 
-#import "Freedom.h"
-#import "TGImageUtils.h"
-#import "TGObserverProxy.h"
+#import <LegacyComponents/TGObserverProxy.h>
 
 #import "TGAppDelegate.h"
-#import "TGOverlayControllerWindow.h"
 
 #import "TGInterfaceManager.h"
 
@@ -75,7 +75,7 @@ void freedomPIPInit();
         TGEmbedPIPWindow *window = [[TGEmbedPIPWindow alloc] initWithFrame:TGAppDelegateInstance.rootController.applicationBounds];
         window.backgroundColor = [UIColor clearColor];
         window.rootViewController = self;
-        window.windowLevel = 100000000.0f + 0.001f;
+        window.windowLevel = UIWindowLevelStatusBar - 0.0001;
         window.hidden = false;
         _window = window;
         
@@ -336,7 +336,7 @@ void freedomPIPInit();
     }
     else
     {
-        [[TGInterfaceManager instance] navigateToConversationWithId:_location.peerId conversation:nil performActions:nil atMessage:@{ @"mid": @(_location.messageId), @"openMedia": @true, @"embed": @(_location.embed), @"cancelPIP": @true, @"pipLocation": _location } clearStack:true openKeyboard:false canOpenKeyboardWhileInTransition:false animated:true];
+        [[TGInterfaceManager instance] navigateToConversationWithId:_location.conversationId conversation:nil performActions:nil atMessage:@{ @"mid": @(_location.messageId), @"openMedia": @true, @"embed": @(_location.embed), @"cancelPIP": @true, @"pipLocation": _location } clearStack:true openKeyboard:false canOpenKeyboardWhileInTransition:false animated:true];
     }
 }
 
@@ -567,9 +567,10 @@ void freedomPIPInit();
  
     bool isLandscape = UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation);
     
+    UIEdgeInsets safeAreaInset = [self calculatedSafeAreaInset];
     CGFloat topBarHeight = isLandscape ? TGEmbedPIPLandscapeNavigationBarHeight : TGEmbedPIPPortraitNavigationBarHeight;
     CGFloat topMargin = TGEmbedPIPViewMargin + topBarHeight + statusBarHeight;
-    CGFloat bottomMargin = TGEmbedPIPViewMargin + 44.0f + _keyboardHeight;
+    CGFloat bottomMargin = TGEmbedPIPViewMargin + 44.0f + _keyboardHeight + (_keyboardHeight < FLT_EPSILON ? safeAreaInset.bottom : 0.0f);
     CGFloat hiddenWidth = size.width - TGEmbedPIPSlipSize;
     
     CGFloat bottomY = self.view.frame.size.height - bottomMargin - size.height;
@@ -579,14 +580,14 @@ void freedomPIPInit();
     {
         case TGEmbedPIPCornerTopLeft:
         {
-            CGRect rect = CGRectMake(TGEmbedPIPViewMargin, topY, size.width, size.height);
+            CGRect rect = CGRectMake(TGEmbedPIPViewMargin + safeAreaInset.left, topY, size.width, size.height);
             if (hidden)
                 rect.origin.x -= hiddenWidth;
             return rect;
         }
         case TGEmbedPIPCornerBottomRight:
         {
-            CGRect rect = CGRectMake(self.view.frame.size.width - TGEmbedPIPViewMargin - size.width, bottomY, size.width, size.height);
+            CGRect rect = CGRectMake(self.view.frame.size.width - TGEmbedPIPViewMargin - size.width - safeAreaInset.right, bottomY, size.width, size.height);
             if (hidden)
                 rect.origin.x += hiddenWidth;
             return rect;
@@ -594,7 +595,7 @@ void freedomPIPInit();
             
         case TGEmbedPIPCornerBottomLeft:
         {
-            CGRect rect = CGRectMake(TGEmbedPIPViewMargin, bottomY, size.width, size.height);
+            CGRect rect = CGRectMake(TGEmbedPIPViewMargin + safeAreaInset.left, bottomY, size.width, size.height);
             if (hidden)
                 rect.origin.x -= hiddenWidth;
             return rect;
@@ -603,7 +604,7 @@ void freedomPIPInit();
         case TGEmbedPIPCornerTopRight:
         default:
         {
-            CGRect rect = CGRectMake(self.view.frame.size.width - TGEmbedPIPViewMargin - size.width, topY, size.width, size.height);
+            CGRect rect = CGRectMake(self.view.frame.size.width - TGEmbedPIPViewMargin - size.width - safeAreaInset.right, topY, size.width, size.height);
             if (hidden)
                 rect.origin.x += hiddenWidth;
             return rect;
@@ -786,7 +787,7 @@ static TGEmbedPIPCorner defaultCorner = TGEmbedPIPCornerTopRight;
 
 + (void)startPictureInPictureWithPlayerView:(UIView<TGPIPAblePlayerView> *)playerView location:(TGPIPSourceLocation *)location corner:(TGEmbedPIPCorner)corner onTransitionBegin:(void (^)(void))onTransitionBegin onTransitionFinished:(void (^)(void))onTransitionFinished
 {
-    if (location == nil || location.peerId == 0)
+    if (location == nil || location.conversationId == 0)
         return;
     
     if (activePIPController != nil && (activePIPController->_closing || [activePIPController->_location isEqual:location]))
@@ -1009,7 +1010,7 @@ static MPVolumeView *volumeOverlayFixView;
     {
         pipCompletion = [completion copy];
      
-        [[TGInterfaceManager instance] navigateToConversationWithId:pipLocation.peerId conversation:nil performActions:nil atMessage:@{ @"mid": @(pipLocation.messageId), @"openMedia": @true, @"embed": @(pipLocation.embed), @"cancelPIP": @true, @"pipLocation": pipLocation } clearStack:true openKeyboard:false canOpenKeyboardWhileInTransition:false animated:true];
+        [[TGInterfaceManager instance] navigateToConversationWithId:pipLocation.conversationId conversation:nil performActions:nil atMessage:@{ @"mid": @(pipLocation.messageId), @"openMedia": @true, @"embed": @(pipLocation.embed), @"cancelPIP": @true, @"pipLocation": pipLocation } clearStack:true openKeyboard:false canOpenKeyboardWhileInTransition:false animated:true];
     }
 }
 
@@ -1152,13 +1153,13 @@ void freedomPIPInit()
 
 @implementation TGPIPSourceLocation
 
-- (instancetype)initWithEmbed:(bool)embed peerId:(int64_t)peerId messageId:(int32_t)messageId localId:(int32_t)localId webPage:(TGWebPageMediaAttachment *)webPage
+- (instancetype)initWithEmbed:(bool)embed conversationId:(int64_t)conversationId messageId:(int32_t)messageId localId:(int32_t)localId webPage:(TGWebPageMediaAttachment *)webPage
 {
     self = [super init];
     if (self != nil)
     {
         _embed = embed;
-        _peerId = peerId;
+        _conversationId = conversationId;
         _messageId = messageId;
         _localId = localId;
         _webPage = webPage;
@@ -1175,7 +1176,7 @@ void freedomPIPInit()
         return false;
     
     TGPIPSourceLocation *location = (TGPIPSourceLocation *)object;
-    return _embed == location.embed && _peerId == location.peerId && _messageId == location.messageId && _localId == location.localId;
+    return _embed == location.embed && _conversationId == location.conversationId && _messageId == location.messageId && _localId == location.localId;
 }
 
 @end

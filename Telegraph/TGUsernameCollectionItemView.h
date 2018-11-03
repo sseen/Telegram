@@ -4,8 +4,12 @@
 
 @property (nonatomic, copy) void (^usernameChanged)(NSString *);
 @property (nonatomic, copy) void (^returnPressed)();
+@property (nonatomic, copy) NSString *(^textPasted)(NSRange, NSString *);
+@property (nonatomic, copy) bool (^shouldChangeText)(NSString *);
 
 - (void)setTitle:(NSString *)title;
+- (void)setTitleColor:(UIColor *)titleColor;
+
 - (void)setPlaceholder:(NSString *)placeholder;
 - (void)setPrefix:(NSString *)prefix;
 - (void)setSecureEntry:(bool)secureEntry;
@@ -14,7 +18,10 @@
 - (void)setUsername:(NSString *)username;
 - (void)setUsernameValid:(bool)usernameValid;
 - (void)setUsernameChecking:(bool)usernameChecking;
+- (void)setClearable:(bool)clearable;
 - (void)setMinimalInset:(CGFloat)minimalInset;
-- (void)setAutoCapitalize:(bool)autoCapitalize;
+- (void)setAutocapitalizationType:(UITextAutocapitalizationType)autocapitalizationType;
+
+- (bool)textFieldIsFirstResponder;
 
 @end

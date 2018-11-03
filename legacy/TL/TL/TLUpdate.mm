@@ -2416,7 +2416,7 @@
 
 - (int32_t)TLconstructorSignature
 {
-    return (int32_t)0xd711a2cc;
+    return (int32_t)0x19d27f3c;
 }
 
 - (int32_t)TLconstructorName
@@ -2583,3 +2583,235 @@
 
 @end
 
+@implementation TLUpdate$updateFavedStickers : TLUpdate
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0xe511996d;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0x23cfb248;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)__unused metaObject
+{
+    TLUpdate$updateFavedStickers *object = [[TLUpdate$updateFavedStickers alloc] init];
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)__unused values
+{
+}
+
+
+@end
+
+@implementation TLUpdate$updateChannelReadMessagesContents : TLUpdate
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0x89893b45;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0xb26ed96e;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLUpdate$updateChannelReadMessagesContents *object = [[TLUpdate$updateChannelReadMessagesContents alloc] init];
+    object.channel_id = metaObject->getInt32((int32_t)0x1cfcdb86);
+    object.messages = metaObject->getArray((int32_t)0x8c97b94f);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.channel_id;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x1cfcdb86, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypeVector;
+        value.nativeObject = self.messages;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x8c97b94f, value));
+    }
+}
+
+
+@end
+
+@implementation TLUpdate$updateContactsReset : TLUpdate
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0x7084a7be;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0xe32254dd;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)__unused metaObject
+{
+    TLUpdate$updateContactsReset *object = [[TLUpdate$updateContactsReset alloc] init];
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)__unused values
+{
+}
+
+
+@end
+
+@implementation TLUpdate$updateChannelAvailableMessages : TLUpdate
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0x70db6837;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0x221242b5;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLUpdate$updateChannelAvailableMessages *object = [[TLUpdate$updateChannelAvailableMessages alloc] init];
+    object.channel_id = metaObject->getInt32((int32_t)0x1cfcdb86);
+    object.available_min_id = metaObject->getInt32((int32_t)0x9e2c6fd0);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.channel_id;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x1cfcdb86, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.available_min_id;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x9e2c6fd0, value));
+    }
+}
+
+
+@end
+
+@implementation TLUpdate$updateReadFeedMeta : TLUpdate
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0x6fa68e41;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0x221242b5;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLUpdate$updateReadFeedMeta *object = [[TLUpdate$updateReadFeedMeta alloc] init];
+    object.flags = metaObject->getInt32((int32_t)0x81915c23);
+    object.feed_id = metaObject->getInt32((int32_t)0xf204bed5);
+    object.max_position = metaObject->getObject((int32_t)0x7d9baa49);
+    object.unread_count = metaObject->getInt32((int32_t)0xa6b586be);
+    object.unread_muted_count = metaObject->getInt32((int32_t)0xcbc42ccb);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.flags;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x81915c23, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.feed_id;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0xf204bed5, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypeObject;
+        value.nativeObject = self.max_position;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x7d9baa49, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.unread_count;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0xa6b586be, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.unread_muted_count;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0xcbc42ccb, value));
+    }
+}
+
+
+@end
+
+@implementation TLUpdate$updateDialogUnreadMark : TLUpdate
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0xe16459c3;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0x501214a2;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLUpdate$updateDialogUnreadMark *object = [[TLUpdate$updateDialogUnreadMark alloc] init];
+    object.flags = metaObject->getInt32((int32_t)0x81915c23);
+    object.peer = metaObject->getObject((int32_t)0x9344c37d);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypePrimitiveInt32;
+        value.primitive.int32Value = self.flags;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x81915c23, value));
+    }
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypeObject;
+        value.nativeObject = self.peer;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x9344c37d, value));
+    }
+}
+
+
+@end

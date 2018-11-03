@@ -1,8 +1,26 @@
 #import "TGModernButtonViewModel.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGModernButtonView.h"
 
+@interface TGModernButtonViewModel ()
+{
+    bool _displayProgress;
+}
+@end
+
 @implementation TGModernButtonViewModel
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self != nil)
+    {
+        _titleColor = [UIColor whiteColor];
+    }
+    return self;
+}
 
 - (Class)viewClass
 {
@@ -32,7 +50,7 @@
         [view setExtendedEdgeInsets:_extendedEdgeInsets];
         [view setSupplementaryIcon:_supplementaryIcon];
         
-        [view setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        [view setTitleColor:_titleColor forState:UIControlStateNormal];
         [view setTitleEdgeInsets:UIEdgeInsetsMake(0.0f, 4.0f, 0.0f, 4.0f)];
         [view.titleLabel setLineBreakMode:NSLineBreakByTruncatingTail];
     }
@@ -41,7 +59,7 @@
     
     view.modernHighlight = _modernHighlight;
     
-    [view setDisplayProgress:_displayProgress animated:false];
+    [view setDisplayProgress:_displayProgress animated:false presentation:self.presentation];
 }
 
 - (void)unbindView:(TGModernViewStorage *)viewStorage {
@@ -58,6 +76,14 @@
     {
         [(TGModernButtonView *)[self boundView] setTitle:_title];
     }
+}
+
+- (void)setTitleColor:(UIColor *)titleColor
+{
+    _titleColor = titleColor;
+    
+    if ([self boundView] != nil)
+        [(TGModernButtonView *)[self boundView] setTitleColor:_titleColor];
 }
 
 - (void)setPossibleTitles:(NSArray *)possibleTitles
@@ -144,13 +170,9 @@
     }
 }
 
-- (void)setDisplayProgress:(bool)displayProgress {
-    [self setDisplayProgress:displayProgress animated:true];
-}
-
 - (void)setDisplayProgress:(bool)displayProgress animated:(bool)animated {
     _displayProgress = displayProgress;
-    [(TGModernButtonView *)[self boundView] setDisplayProgress:displayProgress animated:animated];
+    [(TGModernButtonView *)[self boundView] setDisplayProgress:displayProgress animated:animated presentation:self.presentation];
 }
 
 @end

@@ -1,28 +1,30 @@
 #import "TGAccessChecker.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import <CoreLocation/CoreLocation.h>
 #import "TGSynchronizeContactsActor.h"
-#import "TGMediaAssetsLibrary.h"
-#import "PGCamera.h"
+#import <LegacyComponents/TGMediaAssetsLibrary.h>
+#import <LegacyComponents/PGCamera.h>
 
 #import "TGAccessRequiredAlertView.h"
 
 @implementation TGAccessChecker
 
-+ (bool)checkAddressBookAuthorizationStatusWithAlertDismissComlpetion:(void (^)(void))alertDismissCompletion
+- (bool)checkAddressBookAuthorizationStatusWithAlertDismissComlpetion:(void (^)(void))alertDismissCompletion
 {
     if ([TGSynchronizeContactsManager instance].phonebookAccessStatus == TGPhonebookAccessStatusDisabled)
     {
-        [[[TGAccessRequiredAlertView alloc] initWithMessage:TGLocalized(@"AccessDenied.Contacts")
+        [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.Contacts")
                                          showSettingsButton:true
-                                            completionBlock:alertDismissCompletion] show];
+                                            completionBlock:alertDismissCompletion];
         return false;
     }
     
     return true;
 }
 
-+ (bool)checkPhotoAuthorizationStatusForIntent:(TGPhotoAccessIntent)intent alertDismissCompletion:(void (^)(void))alertDismissCompletion
+- (bool)checkPhotoAuthorizationStatusForIntent:(TGPhotoAccessIntent)intent alertDismissCompletion:(void (^)(void))alertDismissCompletion
 {
     switch ([TGMediaAssetsLibrary authorizationStatus])
     {
@@ -47,17 +49,17 @@
                     break;
             }
             
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:message
+            [TGAccessRequiredAlertView presentWithMessage:message
                                              showSettingsButton:true
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
         case TGMediaLibraryAuthorizationStatusRestricted:
         {
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:TGLocalized(@"AccessDenied.PhotosRestricted")
+            [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.PhotosRestricted")
                                              showSettingsButton:false
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
@@ -66,7 +68,7 @@
     }
 }
 
-+ (bool)checkMicrophoneAuthorizationStatusForIntent:(TGMicrophoneAccessIntent)intent alertDismissCompletion:(void (^)(void))alertDismissCompletion
+- (bool)checkMicrophoneAuthorizationStatusForIntent:(TGMicrophoneAccessIntent)intent alertDismissCompletion:(void (^)(void))alertDismissCompletion
 {
     switch ([PGCamera microphoneAuthorizationStatus])
     {
@@ -92,17 +94,17 @@
                     break;
             }
             
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:message
+            [TGAccessRequiredAlertView presentWithMessage:message
                                              showSettingsButton:true
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
         case PGMicrophoneAuthorizationStatusRestricted:
         {
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:TGLocalized(@"AccessDenied.MicrophoneRestricted")
+            [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.MicrophoneRestricted")
                                              showSettingsButton:false
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
@@ -111,7 +113,7 @@
     }
 }
 
-+ (bool)checkCameraAuthorizationStatusForIntent:(TGCameraAccessIntent)intent alertDismissCompletion:(void (^)(void))alertDismissCompletion
+- (bool)checkCameraAuthorizationStatusForIntent:(TGCameraAccessIntent)intent alertDismissCompletion:(void (^)(void))alertDismissCompletion
 {
 #if TARGET_IPHONE_SIMULATOR
     if (true) {
@@ -121,9 +123,9 @@
     
     if (![PGCamera cameraAvailable])
     {
-        [[[TGAccessRequiredAlertView alloc] initWithMessage:TGLocalized(@"AccessDenied.CameraDisabled")
+        [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.CameraDisabled")
                                          showSettingsButton:true
-                                            completionBlock:alertDismissCompletion] show];
+                                            completionBlock:alertDismissCompletion];
         
         return false;
     }
@@ -144,17 +146,17 @@
                     break;
             }
             
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:message
+            [TGAccessRequiredAlertView presentWithMessage:message
                                              showSettingsButton:true
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
         case PGCameraAuthorizationStatusRestricted:
         {
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:TGLocalized(@"AccessDenied.CameraRestricted")
+            [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.CameraRestricted")
                                              showSettingsButton:false
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
@@ -163,25 +165,52 @@
     }
 }
 
-+ (bool)checkLocationAuthorizationStatusForIntent:(TGLocationAccessIntent)intent alertDismissComlpetion:(void (^)(void))alertDismissCompletion
+- (bool)checkLocationAuthorizationStatusForIntent:(TGLocationAccessIntent)intent alertDismissComlpetion:(void (^)(void))alertDismissCompletion
 {
     switch ([CLLocationManager authorizationStatus])
     {
         case kCLAuthorizationStatusDenied:
         {
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:intent == TGLocationAccessIntentSend ? TGLocalized(@"AccessDenied.LocationDenied") : TGLocalized(@"AccessDenied.LocationTracking")
+            NSString *message = nil;
+            switch (intent)
+            {
+                case TGLocationAccessIntentSend:
+                    message = TGLocalized(@"AccessDenied.LocationDenied");
+                    break;
+                    
+                case TGLocationAccessIntentTracking:
+                    message = TGLocalized(@"AccessDenied.LocationTracking");
+                    break;
+                    
+                case TGLocationAccessIntentLiveLocation:
+                    message = TGLocalized(@"AccessDenied.LocationAlwaysDenied");
+                    break;
+            }
+            [TGAccessRequiredAlertView presentWithMessage:message
                                              showSettingsButton:true
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
             
         case kCLAuthorizationStatusRestricted:
         {
-            [[[TGAccessRequiredAlertView alloc] initWithMessage:TGLocalized(@"AccessDenied.LocationDisabled")
+            [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.LocationDisabled")
                                              showSettingsButton:false
-                                                completionBlock:alertDismissCompletion] show];
+                                                completionBlock:alertDismissCompletion];
         }
             return false;
+            
+        case kCLAuthorizationStatusAuthorizedWhenInUse:
+        {
+            if (intent == TGLocationAccessIntentLiveLocation)
+            {
+                [TGAccessRequiredAlertView presentWithMessage:TGLocalized(@"AccessDenied.LocationAlwaysDenied")
+                                                 showSettingsButton:true
+                                                    completionBlock:alertDismissCompletion];
+                return false;
+            }
+        }
+            return true;
 
         default:
             return true;

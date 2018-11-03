@@ -1,16 +1,18 @@
 #import "TGWebAppController.h"
+
+#import <LegacyComponents/LegacyComponents.h>
+
 #import <WebKit/WebKit.h>
 #import "TGModernConversationTitleView.h"
 
 #import "TGForwardTargetController.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 
-#import "TGImageUtils.h"
 #import "TGDatabase.h"
 #import "TGBotSignals.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 
 #import "TGInterfaceManager.h"
 
@@ -113,6 +115,11 @@
     [ActionStageInstance() removeWatcher:self];
     
     [_shareDisposable dispose];
+}
+
+- (void)setPresentation:(TGPresentation *)presentation {
+    _presentation = presentation;
+    _titleView.presentation = presentation;
 }
 
 - (void)closePressed {
@@ -293,8 +300,12 @@
     if ([navigationAction.request.URL.host isEqualToString:_url.host]) {
         decisionHandler(WKNavigationActionPolicyAllow);
     } else {
-        //decisionHandler(WKNavigationActionPolicyCancel);
-        decisionHandler(WKNavigationActionPolicyAllow);
+        if ([navigationAction.request.URL.host isEqualToString:@"telegram.me"] || [navigationAction.request.URL.host isEqualToString:@"t.me"]) {
+            [[UIApplication sharedApplication] openURL:navigationAction.request.URL];
+            decisionHandler(WKNavigationActionPolicyCancel);
+        } else {
+            decisionHandler(WKNavigationActionPolicyAllow);
+        }
     }
 }
 

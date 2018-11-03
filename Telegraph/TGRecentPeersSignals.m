@@ -1,5 +1,7 @@
 #import "TGRecentPeersSignals.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGTelegraph.h"
 #import "TGDatabase.h"
 #import "TGTelegramNetworking.h"
@@ -7,7 +9,6 @@
 #import "TGUserDataRequestBuilder.h"
 #import "TGConversation+Telegraph.h"
 #import "TGMessage+Telegraph.h"
-#import "TGPeerIdAdapter.h"
 
 #import "TGRecentHashtagsSignal.h"
 
@@ -18,6 +19,8 @@
 #import "TGRemoteRecentPeer.h"
 #import "TGRemoteRecentPeerSet.h"
 #import "TGRemoteRecentPeerCategories.h"
+
+#import "TLRPCcontacts_toggleTopPeers.h"
 
 @implementation TGRecentPeersSignals
 
@@ -78,7 +81,7 @@
 
 + (SSignal *)remoteRecentPeerCategories {
     TLRPCcontacts_getTopPeers$contacts_getTopPeers *getTopPeers = [[TLRPCcontacts_getTopPeers$contacts_getTopPeers alloc] init];
-    getTopPeers.flags = (1 << 0) | (1 << 1) | (1 << 10) | (1 << 2);
+    getTopPeers.flags = (1 << 0) | (1 << 2);
     getTopPeers.offset = 0;
     getTopPeers.limit = 100;
     getTopPeers.n_hash = 0;
@@ -104,9 +107,11 @@
                 }
             }
             
-            return [[TGRemoteRecentPeerCategories alloc] initWithLastRefreshTimestamp:CFAbsoluteTimeGetCurrent() categories:categories];
+            return [[TGRemoteRecentPeerCategories alloc] initWithLastRefreshTimestamp:CFAbsoluteTimeGetCurrent() categories:categories disabled:false];
+        } else if ([result isKindOfClass:[TLcontacts_TopPeers$contacts_topPeersDisabled class]]) {
+            return [[TGRemoteRecentPeerCategories alloc] initWithLastRefreshTimestamp:CFAbsoluteTimeGetCurrent() categories:@{} disabled:true];
         } else {
-            return [[TGRemoteRecentPeerCategories alloc] initWithLastRefreshTimestamp:CFAbsoluteTimeGetCurrent() categories:@{}];
+            return [SSignal complete];
         }
     }];
 }
@@ -155,6 +160,20 @@
                     return [SSignal complete];
                 }] startOn:[SQueue wrapConcurrentNativeQueue:[TGDatabaseInstance() databaseQueue]]];
             }];
+        }
+    }];
+}
+
++ (SSignal *)toggleRecentPeersEnabled:(bool)enabled {
+    TLRPCcontacts_toggleTopPeers *toggleTopPeers = [[TLRPCcontacts_toggleTopPeers alloc] init];
+    toggleTopPeers.enabled = enabled;
+    return [[[TGTelegramNetworking instance] requestSignal:toggleTopPeers] mapToSignal:^SSignal *(__unused id result) {
+        if (!enabled) {
+            [TGDatabaseInstance() replaceCachedRecentPeers:[[TGRemoteRecentPeerCategories alloc] initWithLastRefreshTimestamp:CFAbsoluteTimeGetCurrent() categories:@{} disabled:true]];
+            return [SSignal complete];
+        } else {
+            [TGDatabaseInstance() replaceCachedRecentPeers:[[TGRemoteRecentPeerCategories alloc] initWithLastRefreshTimestamp:0 categories:@{} disabled:false]];
+            return [self updateRecentPeers];
         }
     }];
 }

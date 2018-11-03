@@ -2,13 +2,11 @@
 
 #import "TLMetaClassStore.h"
 
-//inputMediaUploadedPhoto flags:# file:InputFile caption:string stickers:flags.0?Vector<InputDocument> = InputMedia
-
 @implementation TLInputMediaUploadedPhoto
 
 - (int32_t)TLconstructorSignature
 {
-    return 0x630c9af1;
+    return 0x1e287d04;
 }
 
 - (int32_t)TLconstructorName
@@ -24,8 +22,6 @@
         TLMetaClassStore::serializeObject(os, self.file, true);
     }
     
-    [os writeString:self.caption];
-    
     if ((self.flags & (1 << 0)) && self.stickers != nil) {
         int32_t vectorSignature = TL_UNIVERSAL_VECTOR_CONSTRUCTOR;
         [os writeInt32:vectorSignature];
@@ -35,11 +31,81 @@
             TLMetaClassStore::serializeObject(os, sticker, true);
         }
     }
+    
+    if (self.flags & (1 << 1)) {
+        [os writeInt32:self.ttl_seconds];
+    }
 }
 
 - (id<TLObject>)TLdeserialize:(NSInputStream *)__unused is signature:(int32_t)__unused signature environment:(id<TLSerializationEnvironment>)__unused environment context:(TLSerializationContext *)__unused context error:(__autoreleasing NSError **)__unused error
 {
     TLInputMediaUploadedPhoto *result = [[TLInputMediaUploadedPhoto alloc] init];
+    
+    return result;
+}
+
+@end
+
+
+@implementation TLInputMediaPhoto
+
+- (int32_t)TLconstructorSignature
+{
+    return 0xb3ba0635;
+}
+
+- (int32_t)TLconstructorName
+{
+    return -1;
+}
+
+- (void)TLserialize:(NSOutputStream *)__unused os
+{
+    [os writeInt32:self.flags];
+    
+    TLMetaClassStore::serializeObject(os, self.n_id, true);
+    
+    if (self.flags & (1 << 0)) {
+        [os writeInt32:self.ttl_seconds];
+    }
+}
+
+- (id<TLObject>)TLdeserialize:(NSInputStream *)__unused is signature:(int32_t)__unused signature environment:(id<TLSerializationEnvironment>)__unused environment context:(TLSerializationContext *)__unused context error:(__autoreleasing NSError **)__unused error
+{
+    TLInputMediaPhoto *result = [[TLInputMediaPhoto alloc] init];
+    
+    return result;
+}
+
+@end
+
+
+@implementation TLInputMediaPhotoExternal
+
+- (int32_t)TLconstructorSignature
+{
+    return 0xe5bbfe1a;
+}
+
+- (int32_t)TLconstructorName
+{
+    return -1;
+}
+
+- (void)TLserialize:(NSOutputStream *)__unused os
+{
+    [os writeInt32:self.flags];
+    
+    [os writeString:self.url];
+    
+    if (self.flags & (1 << 0)) {
+        [os writeInt32:self.ttl_seconds];
+    }
+}
+
+- (id<TLObject>)TLdeserialize:(NSInputStream *)__unused is signature:(int32_t)__unused signature environment:(id<TLSerializationEnvironment>)__unused environment context:(TLSerializationContext *)__unused context error:(__autoreleasing NSError **)__unused error
+{
+    TLInputMediaPhotoExternal *result = [[TLInputMediaPhotoExternal alloc] init];
     
     return result;
 }

@@ -1,4 +1,4 @@
-#import "TGModernGalleryImageItem.h"
+#import <LegacyComponents/TGModernGalleryImageItem.h>
 
 #import "TGGenericPeerGalleryItem.h"
 
@@ -14,6 +14,7 @@
 @property (nonatomic) int32_t messageId;
 @property (nonatomic) int64_t peerId;
 @property (nonatomic, strong) NSString *caption;
+@property (nonatomic, strong) NSArray *textCheckingResults;
 
 - (instancetype)initWithDocument:(TGDocumentMediaAttachment *)documentMedia peerId:(int64_t)peerId messageId:(int32_t)messageId;
 

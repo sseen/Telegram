@@ -1,18 +1,16 @@
 #import "TGModernConversationGenericTitlePanel.h"
 
-#import "TGImageUtils.h"
-#import "TGFont.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGBackdropView.h"
-#import "TGViewController.h"
+#import <LegacyComponents/TGModernButton.h>
 
-#import "TGModernButton.h"
+#import <LegacyComponents/ASHandle.h>
 
-#import "ASHandle.h"
+#import "TGPresentation.h"
 
 @interface TGModernConversationGenericTitleButton : TGModernButton
 
-- (instancetype)initWithTitle:(NSString *)title icon:(UIImage *)icon;
+- (instancetype)initWithTitle:(NSString *)title icon:(UIImage *)icon color:(UIColor *)color;
 
 @end
 
@@ -36,23 +34,30 @@
     self = [super initWithFrame:CGRectMake(frame.origin.x, frame.origin.y, frame.size.width, MAX(36.0f, frame.size.height))];
     if (self)
     {
-        if (!TGBackdropEnabled())
-        {
-            _backgroundView = [TGBackdropView viewWithLightNavigationBarStyle];
-            [self addSubview:_backgroundView];
-        }
-        else
-        {
-            UIToolbar *toolbar = [[UIToolbar alloc] init];
-            _backgroundView = toolbar;
-            [self addSubview:_backgroundView];
-        }
+        _backgroundView = [TGBackdropView viewWithLightNavigationBarStyle];
+        [self addSubview:_backgroundView];
         
         _stripeLayer = [[CALayer alloc] init];
         _stripeLayer.backgroundColor = UIColorRGB(0xb2b2b2).CGColor;
         [self.layer addSublayer:_stripeLayer];
     }
     return self;
+}
+
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    [super setPresentation:presentation];
+    
+    _backgroundView.backgroundColor = presentation.pallete.barBackgroundColor;
+    _stripeLayer.backgroundColor = presentation.pallete.barSeparatorColor.CGColor;
+    
+    for (TGModernConversationGenericTitleButton *button in self.subviews)
+    {
+        if (![button isKindOfClass:[TGModernConversationGenericTitleButton class]])
+            continue;
+        
+        [button setTitleColor:presentation.pallete.navigationButtonColor];
+    }
 }
 
 - (void)setButtonsWithTitlesAndActions:(NSArray *)buttonsDesc
@@ -68,7 +73,7 @@
     
     for (NSDictionary *desc in buttonsDesc)
     {
-        TGModernConversationGenericTitleButton *button = [[TGModernConversationGenericTitleButton alloc] initWithTitle:desc[@"title"] icon:desc[@"icon"]];
+        TGModernConversationGenericTitleButton *button = [[TGModernConversationGenericTitleButton alloc] initWithTitle:desc[@"title"] icon:desc[@"icon"] color:self.presentation.pallete.navigationButtonColor];
         [button addTarget:self action:@selector(buttonPressed:) forControlEvents:UIControlEventTouchUpInside];
         [buttons addObject:button];
         [buttonActions addObject:desc[@"action"] == nil ? @"" : desc[@"action"]];
@@ -89,18 +94,20 @@
     
     _stripeLayer.frame = CGRectMake(0.0f, self.frame.size.height - TGScreenPixel, self.frame.size.width, TGScreenPixel);
     
+    CGFloat width = self.frame.size.width - self.safeAreaInset.left - self.safeAreaInset.right;
+    
     if (_buttons.count != 0)
     {
         CGSize buttonSize = CGSizeMake(76.0f, 54.0f);
-        CGFloat spacing = (self.frame.size.width - buttonSize.width * _buttons.count) / (_buttons.count + 1);
+        CGFloat spacing = (width - buttonSize.width * _buttons.count) / (_buttons.count + 1);
         CGFloat sideSpacing = floor(spacing * 0.8f);
-        spacing = floor((self.frame.size.width - sideSpacing * 2.0f - buttonSize.width * _buttons.count) / (_buttons.count - 1));
+        spacing = floor((width - sideSpacing * 2.0f - buttonSize.width * _buttons.count) / (_buttons.count - 1));
         
         int index = -1;
         for (UIView *view in _buttons)
         {
             index++;
-            view.frame = CGRectMake(sideSpacing + index * (buttonSize.width + spacing), 0.0f, buttonSize.width, buttonSize.height);
+            view.frame = CGRectMake(self.safeAreaInset.left + sideSpacing + index * (buttonSize.width + spacing), self.frame.size.height - buttonSize.height, buttonSize.width, buttonSize.height);
         }
     }
 }
@@ -131,7 +138,7 @@
 
 @implementation TGModernConversationGenericTitleButton
 
-- (instancetype)initWithTitle:(NSString *)title icon:(UIImage *)icon
+- (instancetype)initWithTitle:(NSString *)title icon:(UIImage *)icon color:(UIColor *)color
 {
     self = [super initWithFrame:CGRectMake(0, 0, 76.0f, 54.0f)];
     if (self != nil)
@@ -142,7 +149,7 @@
         self.imageView.contentMode = UIViewContentModeCenter;
         self.titleLabel.font = TGSystemFontOfSize(10.0f);
         self.titleLabel.textAlignment = NSTextAlignmentCenter;
-        [self setTitleColor:TGAccentColor()];
+        [self setTitleColor:color];
     }
     return self;
 }
@@ -153,7 +160,7 @@
     
     CGRect frame = self.imageView.frame;
     frame.origin.x = floor((self.frame.size.width - frame.size.width) / 2.0f) + TGScreenPixel;
-    frame.origin.y -= 8.0f;
+    frame.origin.y = floor((self.frame.size.height - self.imageView.frame.size.height) / 2.0f) - 8.0f;
     self.imageView.frame = frame;
     
     frame = self.titleLabel.frame;

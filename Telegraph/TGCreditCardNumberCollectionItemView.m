@@ -2,6 +2,8 @@
 
 #import "Stripe.h"
 
+#import "TGPresentation.h"
+
 @interface TGCreditCardNumberCollectionItemView () <STPPaymentCardTextFieldDelegate> {
     STPPaymentCardTextField *_cardField;
 }
@@ -23,10 +25,20 @@
     return self;
 }
 
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    [super setPresentation:presentation];
+    
+    _cardField.textColor = presentation.pallete.collectionMenuTextColor;
+    _cardField.placeholderColor = presentation.pallete.collectionMenuPlaceholderColor;
+    _cardField.textErrorColor = presentation.pallete.collectionMenuDestructiveColor;
+    _cardField.keyboardAppearance = presentation.pallete.isDark ? UIKeyboardAppearanceAlert : UIKeyboardAppearanceDefault;
+}
+
 - (void)layoutSubviews {
     [super layoutSubviews];
     
-    _cardField.frame = CGRectInset(self.bounds, -5.0f, 0.0f);
+    _cardField.frame = CGRectInset(self.bounds, -5.0f + self.safeAreaInset.left, 0.0f);
 }
 
 - (void)paymentCardTextFieldDidChange:(nonnull STPPaymentCardTextField *)textField {

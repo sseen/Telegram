@@ -1,4 +1,6 @@
-#import "TGMenuSheetItemView.h"
+#import <LegacyComponents/TGMenuSheetItemView.h>
+
+@class TGPresentation;
 
 @interface TGShareSendButtonItemView : TGMenuSheetItemView
 
@@ -7,6 +9,7 @@
 @property (nonatomic, copy) void (^didBeginEditingComment)(void);
 
 @property (nonatomic, readonly) NSString *caption;
+@property (nonatomic, strong) TGPresentation *presentation;
 
 - (instancetype)initWithActionTitle:(NSString *)actionTitle action:(void (^)(void))action sendAction:(void (^)(NSString *caption))sendAction;
 

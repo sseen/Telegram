@@ -1,9 +1,6 @@
 #import "TGGenericPeerMediaGalleryGifItem.h"
 
-#import "TGStringUtils.h"
-
-#import "TGMessage.h"
-#import "TGImageInfo.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGGenericPeerMediaGalleryGifItemView.h"
 
@@ -24,8 +21,12 @@
         if ((document.documentId != 0 || document.localDocumentId != 0) && legacyThumbnailCacheUri.length != 0)
         {
             NSMutableString *previewUri = [[NSMutableString alloc] initWithString:@"animation-thumbnail://?"];
-            if (document.documentId != 0)
+            if (document.documentId != 0) {
                 [previewUri appendFormat:@"id=%" PRId64 "", document.documentId];
+                
+                if (document.originInfo != nil)
+                    [previewUri appendFormat:@"&origin_info=%@", [document.originInfo stringRepresentation]];
+            }
             else
                 [previewUri appendFormat:@"local-id=%" PRId64 "", document.localDocumentId];
             

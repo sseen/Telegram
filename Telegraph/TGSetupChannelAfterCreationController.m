@@ -1,6 +1,7 @@
 #import "TGSetupChannelAfterCreationController.h"
 
-#import "TGConversation.h"
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGChannelManagementSignals.h"
 #import "TGDatabase.h"
 
@@ -15,8 +16,8 @@
 
 #import "TGSwitchCollectionItem.h"
 
-#import "TGProgressWindow.h"
-#import "TGAlertView.h"
+#import <LegacyComponents/TGProgressWindow.h>
+#import "TGCustomAlertView.h"
 
 #import "TGSelectContactController.h"
 #import "TGGroupInfoShareLinkController.h"
@@ -210,12 +211,12 @@ typedef enum {
     
     if (!_isPrivate && (_usernameItem.username.length == 0 || _usernameState != TGUsernameControllerUsernameStateValid)) {
         __weak TGSetupChannelAfterCreationController *weakSelf = self;
-        [[[TGAlertView alloc] initWithTitle:nil message:TGLocalized(@"Channel.Setup.PublicNoLink") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:^(__unused bool okButtonPressed) {
+        [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Setup.PublicNoLink") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:^(__unused bool okButtonPressed) {
             __strong TGSetupChannelAfterCreationController *strongSelf = weakSelf;
             if (strongSelf != nil) {
                 [strongSelf->_usernameItem becomeFirstResponder];
             }
-        }] show];
+        }];
         return;
     }
     
@@ -379,7 +380,7 @@ typedef enum {
                  [_invalidUsernameItem setTextColor:UIColorRGB(0xcf3030)];
                  break;
              case TGUsernameControllerUsernameStateTooManyUsernames:
-                 [_invalidUsernameItem setText:TGLocalized(@"Channel.Username.InvalidTooManyUsernames")];
+                 [_invalidUsernameItem setText:TGLocalized(@"Group.Username.RemoveExistingUsernamesInfo")];
                  _invalidUsernameItem.alpha = 1.0f;
                  _invalidUsernameItem.hidden = false;
                  _invalidUsernameItem.showProgress = false;

@@ -2,11 +2,16 @@
 
 @class TLInputFile;
 
-@interface TLInputMediaUploadedPhoto : TLInputMedia
+@interface TLInputMediaUploadedPhoto : TLInputMedia$inputMediaUploadedPhotoMeta
 
-@property (nonatomic) int32_t flags;
-@property (nonatomic, strong) TLInputFile *file;
-@property (nonatomic, strong) NSString *caption;
-@property (nonatomic, strong) NSArray *stickers;
+@end
+
+
+@interface TLInputMediaPhoto : TLInputMedia$inputMediaPhotoMeta
+
+@end
+
+
+@interface TLInputMediaPhotoExternal : TLInputMedia$inputMediaPhotoExternalMeta
 
 @end

@@ -1,14 +1,14 @@
 #import "TGShareCollectionCell.h"
 
-#import "TGLetteredAvatarView.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGConversation.h"
-#import "TGUser.h"
+#import <LegacyComponents/TGLetteredAvatarView.h>
 
-#import "TGFont.h"
-#import "TGImageUtils.h"
+#import <LegacyComponents/TGCheckButtonView.h>
 
-#import "TGCheckButtonView.h"
+#import "TGTelegraph.h"
+
+#import "TGPresentation.h"
 
 NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
 
@@ -24,6 +24,7 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
     bool _isChecked;
     
     bool _showOnlyFirstName;
+    bool _singleWord;
 }
 @end
 
@@ -38,8 +39,6 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
         self.backgroundColor = [UIColor whiteColor];
         
         _avatarView = [[TGLetteredAvatarView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, 60.0f, 60.0f)];
-        _avatarView.backgroundColor = [UIColor whiteColor];
-        _avatarView.opaque = true;
         [_avatarView setSingleFontSize:28.0f doubleFontSize:28.0f useBoldFont:false];
         [self.contentView addSubview:_avatarView];
         
@@ -84,41 +83,45 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
     _titleLabel.numberOfLines = showOnlyFirstName ? 1 : 2;
 }
 
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    if (presentation == nil || _presentation == presentation)
+        return;
+    
+    _presentation = presentation;
+    self.backgroundColor = presentation.pallete.menuBackgroundColor;
+    _selectedCircleView.image = presentation.images.shareSelectionImage;
+}
+
 - (void)setPeer:(id)peer
 {
     CGSize size = _avatarView.bounds.size;
-    static UIImage *placeholder = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^
-    {
-        UIGraphicsBeginImageContextWithOptions(size, false, 0.0f);
-        CGContextRef context = UIGraphicsGetCurrentContext();
-        
-        CGContextSetFillColorWithColor(context, [UIColor whiteColor].CGColor);
-        CGContextFillEllipseInRect(context, CGRectMake(0.0f, 0.0f, size.width, size.height));
-        CGContextSetStrokeColorWithColor(context, UIColorRGB(0xd9d9d9).CGColor);
-        CGContextSetLineWidth(context, 1.0f);
-        CGContextStrokeEllipseInRect(context, CGRectMake(0.5f, 0.5f, size.width - 1.0f, size.height - 1.0f));
-        
-        placeholder = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-    });
+    UIImage *placeholder = [self.presentation.images avatarPlaceholderWithDiameter:60.0f];
     
     int64_t peerId = 0;
     _isSecret = false;
     
     NSString *title = @"";
+    bool singleWord = false;
     if ([peer isKindOfClass:[TGConversation class]])
     {
         TGConversation *conversation = peer;
         peerId = conversation.conversationId;
         _isSecret = conversation.isEncrypted;
-        if (conversation.additionalProperties[@"user"] != nil)
+
+        if (conversation.conversationId == TGTelegraphInstance.clientUserId)
+        {
+            title = TGLocalized(@"DialogList.SavedMessages");
+            if ([title componentsSeparatedByString:@" "].count < 2)
+                singleWord = true;
+            [_avatarView loadSavedMessagesWithSize:size placeholder:placeholder];
+        }
+        else if (conversation.additionalProperties[@"user"] != nil)
         {
             TGUser *user = conversation.additionalProperties[@"user"];
             
             if (user.photoUrlSmall.length != 0)
-                [_avatarView loadImage:user.photoUrlSmall filter:@"circle:60x60" placeholder:placeholder];
+                [_avatarView loadImage:user.photoFullUrlSmall filter:@"circle:60x60" placeholder:placeholder];
             else
                 [_avatarView loadUserPlaceholderWithSize:size uid:user.uid firstName:user.firstName lastName:user.lastName placeholder:placeholder];
             
@@ -129,8 +132,8 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
         }
         else
         {
-            if (conversation.chatPhotoSmall.length != 0)
-                [_avatarView loadImage:conversation.chatPhotoSmall filter:@"circle:60x60" placeholder:placeholder];
+            if (conversation.chatPhotoFullSmall.length != 0)
+                [_avatarView loadImage:conversation.chatPhotoFullSmall filter:@"circle:60x60" placeholder:placeholder];
             else
                 [_avatarView loadGroupPlaceholderWithSize:size conversationId:conversation.conversationId title:conversation.chatTitle placeholder:placeholder];
             title = conversation.chatTitle;
@@ -142,7 +145,7 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
         
         peerId = user.uid;
         if (user.photoUrlSmall.length != 0)
-            [_avatarView loadImage:user.photoUrlSmall filter:@"circle:60x60" placeholder:placeholder];
+            [_avatarView loadImage:user.photoFullUrlSmall filter:@"circle:60x60" placeholder:placeholder];
         else
             [_avatarView loadUserPlaceholderWithSize:size uid:user.uid firstName:user.firstName lastName:user.lastName placeholder:placeholder];
         
@@ -152,13 +155,21 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
             title = [user.displayName stringByReplacingOccurrencesOfString:@" " withString:@"\n"];
     }
     
+    _titleLabel.numberOfLines = singleWord ? 1 : 2;
     _titleLabel.text = title;
-    _titleLabel.frame = CGRectMake(_titleLabel.frame.origin.x, _titleLabel.frame.origin.y, self.frame.size.width, self.frame.size.height);
-    [_titleLabel sizeToFit];
+    
+    CGSize targetSize = self.frame.size;
+    if (singleWord)
+        targetSize = [title sizeWithFont:_titleLabel.font];
+    
+    _titleLabel.frame = CGRectMake((self.frame.size.width - targetSize.width) / 2.0f, _titleLabel.frame.origin.y, targetSize.width, targetSize.height);
+    if (!singleWord)
+        [_titleLabel sizeToFit];
     
     if (!_isChecked)
-        _titleLabel.textColor = _isSecret ? UIColorRGB(0x00a629) : [UIColor blackColor];
+        _titleLabel.textColor = _isSecret ? self.presentation.pallete.dialogEncryptedColor : self.presentation.pallete.dialogTitleColor;
     
+    _singleWord = singleWord;
     _peerId = peerId;
     
     [self setNeedsLayout];
@@ -184,7 +195,7 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
     
     _isChecked = checked;
     
-    _titleLabel.textColor = checked ? TGAccentColor() : (_isSecret ? UIColorRGB(0x00a629) : [UIColor blackColor]);
+    _titleLabel.textColor = checked ? self.presentation.pallete.accentColor : (_isSecret ? self.presentation.pallete.dialogEncryptedColor : self.presentation.pallete.dialogTitleColor);
     
     if (animated && iosMajorVersion() >= 8)
     {
@@ -227,7 +238,10 @@ NSString *const TGShareCollectionCellIdentifier = @"TGShareCollectionCell";
         _selectedCircleView.center = _avatarView.center;
         _checkView.frame = CGRectMake(self.bounds.size.width / 2.0f + 30.0f - _checkView.frame.size.width + 6.0f, 60.0f - _checkView.frame.size.height + 6.0f, _checkView.frame.size.width, _checkView.frame.size.height);
 
-        _titleLabel.frame = CGRectMake(0.0f, 64.0f, self.bounds.size.width, _titleLabel.frame.size.height);
+        if (_singleWord)
+            _titleLabel.frame = CGRectMake((self.frame.size.width - _titleLabel.frame.size.width) / 2.0f, 64.0f, _titleLabel.frame.size.width, _titleLabel.frame.size.height);
+        else
+            _titleLabel.frame = CGRectMake(0.0f, 64.0f, self.bounds.size.width, _titleLabel.frame.size.height);
     }];
 }
 

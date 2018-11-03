@@ -1,20 +1,12 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGPreparedLocalImageMessage.h"
 
-#import "TGMessage.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGAppDelegate.h"
 
 @implementation TGPreparedLocalImageMessage
 
-+ (instancetype)messageWithImageData:(NSData *)imageData imageSize:(CGSize)imageSize thumbnailData:(NSData *)thumbnailData thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl caption:(NSString *)caption replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup stickerDocuments:(NSArray *)stickerDocuments
++ (instancetype)messageWithImageData:(NSData *)imageData imageSize:(CGSize)imageSize thumbnailData:(NSData *)thumbnailData thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl text:(NSString *)text entities:(NSArray *)entities replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup stickerDocuments:(NSArray *)stickerDocuments messageLifetime:(int32_t)messageLifetime groupedId:(int64_t)groupedId
 {
 #ifdef DEBUG
     NSAssert(imageData != nil, @"imageData should not be nil");
@@ -30,17 +22,21 @@
     message.localImageDataPath = [self _fileUrlForStoredData:imageData];
     message.localThumbnailDataPath = [self _fileUrlForStoredData:thumbnailData];
     
-    message.caption = caption;
+    message.text = text;
+    message.entities = entities;
     
     message.replyMessage = replyMessage;
     message.replyMarkup = replyMarkup;
     
     message.stickerDocuments = stickerDocuments;
     
+    message.messageLifetime = messageLifetime;
+    message.groupedId = groupedId;
+    
     return message;
 }
 
-+ (instancetype)messageWithLocalImageDataPath:(NSString *)localImageDataPath imageSize:(CGSize)imageSize localThumbnailDataPath:(NSString *)localThumbnailDataPath thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl caption:(NSString *)caption replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup stickerDocuments:(NSArray *)stickerDocuments
++ (instancetype)messageWithLocalImageDataPath:(NSString *)localImageDataPath imageSize:(CGSize)imageSize localThumbnailDataPath:(NSString *)localThumbnailDataPath thumbnailSize:(CGSize)thumbnailSize assetUrl:(NSString *)assetUrl text:(NSString *)text entities:(NSArray *)entities replyMessage:(TGMessage *)replyMessage replyMarkup:(TGReplyMarkupAttachment *)replyMarkup stickerDocuments:(NSArray *)stickerDocuments messageLifetime:(int32_t)messageLifetime groupedId:(int64_t)groupedId
 {
 #ifdef DEBUG
     NSAssert(localImageDataPath != nil, @"localImageDataPath should not be nil");
@@ -56,12 +52,16 @@
     message.localImageDataPath = localImageDataPath;
     message.localThumbnailDataPath = localThumbnailDataPath;
     
-    message.caption = caption;
+    message.text = text;
+    message.entities = entities;
     
     message.replyMessage = replyMessage;
     message.replyMarkup = replyMarkup;
     
     message.stickerDocuments = stickerDocuments;
+    
+    message.messageLifetime = messageLifetime;
+    message.groupedId = groupedId;
     
     return message;
 }
@@ -77,12 +77,16 @@
     message.localImageDataPath = [TGPreparedLocalImageMessage _fileUrlForStoredFile:source.localImageDataPath];
     message.localThumbnailDataPath = [TGPreparedLocalImageMessage _fileUrlForStoredFile:source.localThumbnailDataPath];
     
-    message.caption = source.caption;
+    message.text = source.text;
+    message.entities = source.entities;
     
     message.replyMessage = source.replyMessage;
     message.replyMarkup = source.replyMarkup;
     
     message.stickerDocuments = source.stickerDocuments;
+    
+    message.messageLifetime = source.messageLifetime;
+    message.groupedId = source.groupedId;
     
     return message;
 }
@@ -126,6 +130,8 @@
     message.date = self.date;
     message.isBroadcast = self.isBroadcast;
     message.messageLifetime = self.messageLifetime;
+    message.groupedId = self.groupedId;
+    message.text = self.text;
     
     NSMutableArray *attachments = [[NSMutableArray alloc] init];
     
@@ -134,7 +140,6 @@
     [imageInfo addImageWithSize:_imageSize url:[self localImageDataPath]];
     [imageInfo addImageWithSize:_thumbnailSize url:[self localThumbnailDataPath]];
     imageAttachment.imageInfo = imageInfo;
-    imageAttachment.caption = self.caption;
     imageAttachment.embeddedStickerDocuments = _stickerDocuments;
     imageAttachment.hasStickers = _stickerDocuments.count != 0;
     [attachments addObject:imageAttachment];
@@ -157,6 +162,9 @@
     }
     
     message.mediaAttachments = attachments;
+    message.entities = self.entities;
+    
+    message.messageLifetime = self.messageLifetime;
     
     return message;
 }

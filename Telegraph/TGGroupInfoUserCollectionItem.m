@@ -1,26 +1,12 @@
-/*
- * This is the source code of Telegram for iOS v. 1.1
- * It is licensed under GNU GPL v. 2 or later.
- * You should have received a copy of the license in this archive (see LICENSE).
- *
- * Copyright Peter Iakovlev, 2013.
- */
-
 #import "TGGroupInfoUserCollectionItem.h"
+
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGGroupInfoUserCollectionItemView.h"
 
-#import "TGDateUtils.h"
-#import "TGUser.h"
-#import "TGConversation.h"
-
-#import "ASHandle.h"
-
-#import "TGStringUtils.h"
+#import <LegacyComponents/ASHandle.h>
 
 #import "TGTelegraph.h"
-
-#import "TGLocalization.h"
 
 @interface TGGroupInfoUserCollectionItem () <TGGroupInfoUserCollectionItemViewDelegate>
 {
@@ -58,7 +44,7 @@
     
     view.delegate = self;
     
-    [view setFirstName:_user.firstName lastName:_user.lastName uidForPlaceholderCalculation:_user.uid canPromote:_canPromote canRestrict:_canRestrict canBan:_canBan canDelete:_canDelete];
+    [view setFirstName:_user.firstName lastName:_user.lastName uidForPlaceholderCalculation:_user.uid canPromote:_canPromote canRestrict:_canRestrict canBan:false canDelete:_canDelete];
     if (_customStatus != nil) {
         [view setStatus:_customStatus active:false];
     } else {
@@ -78,7 +64,7 @@
             [view setStatus:status active:active];
         }
     }
-    [view setAvatarUri:_user.photoUrlSmall];
+    [view setAvatarUri:_user.photoFullUrlSmall];
     [view setEnableEditing:_canEdit animated:false];
     
     if (_conversation == nil)
@@ -91,9 +77,9 @@
         
         if (_user == nil)
         {
-            [view setFirstName:_conversation.chatTitle lastName:@"" uidForPlaceholderCalculation:(int32_t)_conversation.conversationId canPromote:_canPromote canRestrict:_canRestrict canBan:_canBan canDelete:_canDelete];
+            [view setFirstName:_conversation.chatTitle lastName:@"" uidForPlaceholderCalculation:(int32_t)_conversation.conversationId canPromote:_canPromote canRestrict:_canRestrict canBan:false canDelete:_canDelete];
             [view setStatus:[self stringForMemberCount:_conversation.chatParticipantCount] active:false];
-            [view setAvatarUri:_conversation.chatPhotoSmall];
+            [view setAvatarUri:_conversation.chatPhotoFullSmall];
         }
     }
     
@@ -223,7 +209,7 @@
     if ([self boundView] != nil)
     {
         TGGroupInfoUserCollectionItemView *view = (TGGroupInfoUserCollectionItemView *)[self boundView];
-        [view setFirstName:user.firstName lastName:user.lastName uidForPlaceholderCalculation:_user.uid canPromote:_canPromote canRestrict:_canRestrict canBan:_canBan canDelete:_canDelete];
+        [view setFirstName:user.firstName lastName:user.lastName uidForPlaceholderCalculation:_user.uid canPromote:_canPromote canRestrict:_canRestrict canBan:false canDelete:_canDelete];
         if (_customStatus != nil) {
             [view setStatus:_customStatus active:false];
         } else {
@@ -251,7 +237,7 @@
                 }
             }
         }
-        [view setAvatarUri:_user.photoUrlSmall];
+        [view setAvatarUri:_user.photoFullUrlSmall];
     }
 }
 
@@ -279,9 +265,9 @@
         
         if (_user == nil)
         {
-            [view setFirstName:_conversation.chatTitle lastName:@"" uidForPlaceholderCalculation:(int32_t)_conversation.conversationId canPromote:_canBan canRestrict:_canRestrict canBan:_canBan canDelete:_canDelete];
+            [view setFirstName:_conversation.chatTitle lastName:@"" uidForPlaceholderCalculation:(int32_t)_conversation.conversationId canPromote:_canPromote canRestrict:_canRestrict canBan:false canDelete:_canDelete];
             [view setStatus:[self stringForMemberCount:_conversation.chatParticipantCount] active:false];
-            [view setAvatarUri:_conversation.chatPhotoSmall];
+            [view setAvatarUri:_conversation.chatPhotoFullSmall];
         }
     }
 }

@@ -1,15 +1,9 @@
-//
-//  RMIntroViewController.m
-//  IntroOpenGL
-//
-//  Created by Ilya Rimchikov on 19/01/14.
-//
-//
-
 #import "RMGeometry.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGLoginPhoneController.h"
-#import "TGModernButton.h"
+#import <LegacyComponents/TGModernButton.h>
 
 #import "RMIntroViewController.h"
 #import "RMIntroPageView.h"
@@ -22,11 +16,9 @@
 
 #import "TGTelegramNetworking.h"
 
-#import "TGFont.h"
-
 #import "TGLocalizationSignals.h"
-#import "TGAnimationUtils.h"
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGAnimationUtils.h>
+#import <LegacyComponents/TGProgressWindow.h>
 
 #import "TGDatabase.h"
 
@@ -84,6 +76,9 @@
 }
 @end
 
+static NSString *replaceAppTitle(NSString *string, NSString *title) {
+    return [string stringByReplacingOccurrencesOfString:@"Telegram" withString:title];
+}
 
 @implementation RMIntroViewController
 
@@ -97,8 +92,16 @@
         
         self.wantsFullScreenLayout = true;
         
-        _headlines = @[ TGLocalized(@"Tour.Title1"), TGLocalized(@"Tour.Title2"),  TGLocalized(@"Tour.Title6"), TGLocalized(@"Tour.Title3"), TGLocalized(@"Tour.Title4"), TGLocalized(@"Tour.Title5")];
-        _descriptions = @[TGLocalized(@"Tour.Text1"), TGLocalized(@"Tour.Text2"),  TGLocalized(@"Tour.Text6"), TGLocalized(@"Tour.Text3"), TGLocalized(@"Tour.Text4"), TGLocalized(@"Tour.Text5")];
+        NSString *appTitle = [[[NSBundle mainBundle] localizedInfoDictionary] objectForKey:@"CFBundleDisplayName"];
+        if (appTitle == nil) {
+            appTitle = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleDisplayName"];
+        }
+        if (appTitle == nil) {
+            appTitle = @"Telegram";
+        }
+        
+        _headlines = @[ appTitle, TGLocalized(@"Tour.Title2"),  TGLocalized(@"Tour.Title6"), TGLocalized(@"Tour.Title3"), TGLocalized(@"Tour.Title4"), TGLocalized(@"Tour.Title5")];
+        _descriptions = @[replaceAppTitle(TGLocalized(@"Tour.Text1"), appTitle), replaceAppTitle(TGLocalized(@"Tour.Text2"), appTitle), replaceAppTitle(TGLocalized(@"Tour.Text6"), appTitle), replaceAppTitle(TGLocalized(@"Tour.Text3"), appTitle), replaceAppTitle(TGLocalized(@"Tour.Text4"), appTitle), replaceAppTitle(TGLocalized(@"Tour.Text5"), appTitle)];
         
         __weak RMIntroViewController *weakSelf = self;
         _didEnterBackgroundObserver = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil usingBlock:^(__unused NSNotification *notification)
@@ -224,6 +227,9 @@
         _glkView.enableSetNeedsDisplay = false;
         _glkView.userInteractionEnabled = false;
         _glkView.delegate = self;
+        if ([[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"co.one.Teleapp"]) {
+            _glkView.hidden = true;
+        }
         
         int patchHalfWidth = 1;
         UIView *v1 = [[UIView alloc] initWithFrame:CGRectMake(-patchHalfWidth, -patchHalfWidth, _glkView.frame.size.width + patchHalfWidth * 2, patchHalfWidth * 2)];
@@ -321,7 +327,7 @@
         [_startButton setBackgroundImage:startButtonHighlightedImage forState:UIControlStateHighlighted];
         [_startButton setContentEdgeInsets:UIEdgeInsetsMake(0.0f, 20.0f, 0.0f, 20.0f)];
     }
-    _startArrow = [[UIImageView alloc]initWithImage:[UIImage imageNamed:isIpad ? @"start_arrow_ipad.png" : @"start_arrow.png"]];
+    _startArrow = [[UIImageView alloc]initWithImage:TGImageNamed(isIpad ? @"start_arrow_ipad.png" : @"start_arrow.png")];
     _startButton.titleLabel.clipsToBounds = false;
     _startArrow.frame = CGRectChangedOrigin(_startArrow.frame, CGPointMake([_startButton.titleLabel.text sizeWithFont:_startButton.titleLabel.font].width + (isIpad ? 7 : 6), isIpad ? 6.5f : 4.5f));
     //[_startButton.titleLabel addSubview:_startArrow];
@@ -471,6 +477,11 @@
             break;
     }
     
+    if (_glkView.hidden) {
+        pageY -= 54.0;
+        pageControlY -= 54.0;
+    }
+    
     if (!_alternativeLanguageButton.isHidden) {
         startButtonY += languageButtonSpread;
     }
@@ -480,7 +491,7 @@
     
     [_startButton sizeToFit];
     _startButton.frame = CGRectMake(CGFloor((self.view.bounds.size.width - _startButton.frame.size.width) / 2.0f), self.view.bounds.size.height - startButtonY - statusBarHeight, _startButton.frame.size.width, 48.0f);
-    [_startButton addTarget:self action:@selector(startButtonPress) forControlEvents:UIControlEventTouchUpInside];\
+    [_startButton addTarget:self action:@selector(startButtonPress) forControlEvents:UIControlEventTouchUpInside];
     
     _alternativeLanguageButton.frame = CGRectMake(CGFloor((self.view.bounds.size.width - _alternativeLanguageButton.frame.size.width) / 2.0f), CGRectGetMaxY(_startButton.frame) + languageButtonOffset, _alternativeLanguageButton.frame.size.width, _alternativeLanguageButton.frame.size.height);
     
@@ -502,7 +513,7 @@
     {
         _displayedStillLogo = true;
         
-        _stillLogoView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"telegram_logo_still.png"]];
+        _stillLogoView = [[UIImageView alloc] initWithImage:TGImageNamed(@"telegram_logo_still.png")];
         _stillLogoView.contentMode = UIViewContentModeCenter;
         _stillLogoView.bounds = CGRectMake(0, 0, 200, 200);
         

@@ -1,13 +1,15 @@
 #import "TGGroupInviteSheetItemView.h"
 
-#import "TGLetteredAvatarView.h"
-#import "TGFont.h"
-#import "TGStringUtils.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/TGLetteredAvatarView.h>
 
 #import "TGShareSheetSharePeersLayout.h"
 #import "TGModernMediaCollectionView.h"
 #import "TGShareSheetSharePeersCell.h"
 #import "TGGroupInviteSheetMoreCell.h"
+
+#import "TGPresentation.h"
 
 @interface TGGroupInviteSheetItemView () <UICollectionViewDataSource, UICollectionViewDelegateFlowLayout> {
     TGLetteredAvatarView *_avatarView;
@@ -77,6 +79,8 @@
         _recentPeers = users;
         
         _collectionView = [[TGModernMediaCollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:_layout];
+        if (iosMajorVersion() >= 11)
+            _collectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
         _collectionView.backgroundColor = nil;
         _collectionView.opaque = false;
         _collectionView.showsHorizontalScrollIndicator = false;
@@ -95,6 +99,14 @@
         [self addSubview:_collectionView];
     }
     return self;
+}
+
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    [super setPresentation:presentation];
+    
+    _titleLabel.textColor = presentation.pallete.menuTextColor;
+    _infoLabel.textColor = presentation.pallete.menuSecondaryTextColor;
 }
 
 - (CGFloat)preferredHeightForMaximumHeight:(CGFloat)__unused maximumHeight {
@@ -137,12 +149,13 @@
 {
     if (indexPath.section == 0) {
         TGShareSheetSharePeersCell *cell = (TGShareSheetSharePeersCell *)[collectionView dequeueReusableCellWithReuseIdentifier:@"TGAttachmentSheetSharePeersCell" forIndexPath:indexPath];
-        
+        cell.presentation = self.presentation;
         id peer = _recentPeers[indexPath.row];
         [cell setPeer:peer];
         return cell;
     } else {
         TGGroupInviteSheetMoreCell *cell = (TGGroupInviteSheetMoreCell *)[collectionView dequeueReusableCellWithReuseIdentifier:@"TGGroupInviteSheetMoreCell" forIndexPath:indexPath];
+        cell.presentation = self.presentation;
         [cell setCount:_moreCount];
         return cell;
     }

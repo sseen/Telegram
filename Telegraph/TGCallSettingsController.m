@@ -1,7 +1,7 @@
 #import "TGCallSettingsController.h"
 
-#import "ActionStage.h"
-#import "SGraphObjectNode.h"
+#import <LegacyComponents/ActionStage.h>
+#import <LegacyComponents/SGraphObjectNode.h>
 
 #import "TGAppDelegate.h"
 
@@ -13,8 +13,8 @@
 #import "TGVariantCollectionItem.h"
 #import "TGCommentCollectionItem.h"
 
-#import "TGProgressWindow.h"
-#import "TGAlertView.h"
+#import <LegacyComponents/TGProgressWindow.h>
+#import "TGCustomAlertView.h"
 
 #import "TGRecentCallsController.h"
 #import "TGCallDataSettingsController.h"
@@ -214,7 +214,7 @@
                     accountSettings = [[TGAccountSettings alloc] initWithDefaultValues];
                 [self setAccountSettings:accountSettings];
                 
-                [[[TGAlertView alloc] initWithTitle:nil message:TGLocalized(@"PrivacySettings.FloodControlError") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil] show];
+                [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Login.UnknownError") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
             }
         });
     }

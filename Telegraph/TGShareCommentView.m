@@ -1,7 +1,13 @@
 #import "TGShareCommentView.h"
-#import "TGModernButton.h"
-#import "TGFont.h"
-#import "HPTextViewInternal.h"
+
+#import <LegacyComponents/LegacyComponents.h>
+
+#import <LegacyComponents/TGModernButton.h>
+#import <LegacyComponents/HPTextViewInternal.h>
+
+#import "TGAppDelegate.h"
+
+#import "TGPresentation.h"
 
 @interface TGShareCommentView () <UITextViewDelegate>
 {
@@ -41,7 +47,7 @@
         [_placeholderView sizeToFit];
         [self addSubview:_placeholderView];
         
-        _textView = [[HPTextViewInternal alloc] init];
+        _textView = [[HPTextViewInternal alloc] initWithKeyCommandController:TGAppDelegateInstance.keyCommandController];
         _textView.font = _placeholderView.font;
         _textView.backgroundColor = [UIColor clearColor];
         _textView.textColor = [UIColor blackColor];
@@ -69,6 +75,37 @@
     return self;
 }
 
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    _presentation = presentation;
+    
+    CGFloat diameter = 16.0f;
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(diameter, diameter), false, 0.0f);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetFillColorWithColor(context, presentation.pallete.searchBarMergedBackgroundColor.CGColor);
+    CGContextFillEllipseInRect(context, CGRectMake(0.0f, 0.0f, diameter, diameter));
+    UIImage *backgroundImage = [UIGraphicsGetImageFromCurrentImageContext() stretchableImageWithLeftCapWidth:(NSInteger)(diameter / 2.0f) topCapHeight:(NSInteger)(diameter / 2.0f)];
+    UIGraphicsEndImageContext();
+    
+    _backgroundView.image = backgroundImage;
+    
+    _placeholderView.textColor = presentation.pallete.searchBarPlaceholderColor;
+    _textView.textColor = presentation.pallete.searchBarTextColor;
+    _textView.keyboardAppearance = presentation.pallete.isDark ? UIKeyboardAppearanceAlert : UIKeyboardAppearanceDefault;
+    
+    [UIView performWithoutAnimation:^
+    {
+         bool shouldFlip = _textView.isFirstResponder;
+         if (shouldFlip)
+             [_textView resignFirstResponder];
+         _textView.keyboardAppearance = presentation.pallete.isDark ? UIKeyboardAppearanceAlert : UIKeyboardAppearanceDefault;
+         if (shouldFlip)
+             [_textView becomeFirstResponder];
+    }];
+    
+    [_clearButton setImage:presentation.images.searchClearIcon forState:UIControlStateNormal];
+}
+
 - (NSString *)placeholder
 {
     return _placeholderView.text;
@@ -77,6 +114,8 @@
 - (void)setPlaceholder:(NSString *)placeholder
 {
     _placeholderView.text = placeholder;
+    [_placeholderView sizeToFit];
+    [self setNeedsLayout];
 }
 
 - (void)layoutSubviews
@@ -138,9 +177,9 @@
     {
         _clearButton.hidden = false;
         if (_textView.text.length == 0)
-            [_clearButton setImage:[UIImage imageNamed:@"ShareCommentCloseIcon"] forState:UIControlStateNormal];
+            [_clearButton setImage:_presentation.images.shareCloseIcon forState:UIControlStateNormal];
         else
-            [_clearButton setImage:[UIImage imageNamed:@"SearchBarClearIcon"] forState:UIControlStateNormal];
+            [_clearButton setImage:_presentation.images.searchClearIcon forState:UIControlStateNormal];
     }
     else
     {

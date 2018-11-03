@@ -1,10 +1,10 @@
 #import "TGRootController.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGAppDelegate.h"
-#import "TGImageUtils.h"
 
 #import "TGTabletMainView.h"
-#import "TGNavigationController.h"
 
 #import "TGDialogListController.h"
 #import "TGTelegraphDialogListCompanion.h"
@@ -12,9 +12,13 @@
 #import "TGAccountSettingsController.h"
 #import "TGRecentCallsController.h"
 #import "TGMainTabsController.h"
+#import "TGModernConversationController.h"
 
 #import "TGCallStatusBarView.h"
 #import "TGVolumeBarView.h"
+#import "TGProxyWindow.h"
+
+#import "TGPresentation.h"
 
 @interface TGRootController ()
 {
@@ -27,6 +31,8 @@
     
     SVariable *_sizeClassVariable;
     SMetaDisposable *_callDisposable;
+    
+    id<SDisposable> _presentationDisposable;
 }
 
 @end
@@ -41,16 +47,25 @@
         [self setNavigationBarHidden:true animated:false];
         self.automaticallyManageScrollViewInsets = false;
         
+        __weak TGRootController *weakSelf = self;
+        _presentationDisposable = [TGPresentation.signal startWithNext:^(TGPresentation *next)
+        {
+            __strong TGRootController *strongSelf = weakSelf;
+            if (strongSelf != nil)
+                [strongSelf setPresentation:next];
+        }];
+        
         TGTelegraphDialogListCompanion *dialogListCompanion = [[TGTelegraphDialogListCompanion alloc] init];
-        dialogListCompanion.showBroadcastsMenu = true;
         _dialogListController = [[TGDialogListController alloc] initWithCompanion:dialogListCompanion];
+        _dialogListController.presentation = _presentation;
         
         _contactsController = [[TGContactsController alloc] initWithContactsMode:TGContactsModeMainContacts | TGContactsModeRegistered | TGContactsModePhonebook | TGContactsModeSortByLastSeen];
+        _contactsController.presentation = _presentation;
         
         _accountSettingsController = [[TGAccountSettingsController alloc] initWithUid:0];
         
-        __weak TGRootController *weakSelf = self;
         _callsController = [[TGRecentCallsController alloc] init];
+        _callsController.presentation = _presentation;
         _callsController.missedCountChanged = ^(NSInteger count)
         {
             __strong TGRootController *strongSelf = weakSelf;
@@ -58,10 +73,15 @@
                 [strongSelf->_mainTabsController setMissedCallsCount:(int)count];
         };
         
-        _mainTabsController = [[TGMainTabsController alloc] init];
+        _mainTabsController = [[TGMainTabsController alloc] initWithPresentation:_presentation];
         [_mainTabsController setViewControllers:[NSArray arrayWithObjects:_contactsController, _callsController, _dialogListController, _accountSettingsController, nil]];
-        [_mainTabsController setSelectedIndex:2];
         [_mainTabsController setCallsHidden:!TGAppDelegateInstance.showCallsTab animated:false];
+        _mainTabsController.onControllerInsetUpdated = ^(CGFloat inset)
+        {
+            __strong TGRootController *strongSelf = weakSelf;
+            if (strongSelf != nil)
+                [strongSelf->_mainView updateBottomInset:inset];
+        };
         
         _masterNavigationController = [TGNavigationController navigationControllerWithControllers:@[]];
         _detailNavigationController = [TGNavigationController navigationControllerWithControllers:@[]];
@@ -91,6 +111,55 @@
     return self;
 }
 
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    _presentation = presentation;
+    
+    if (self.isViewLoaded)
+        self.view.backgroundColor = presentation.pallete.collectionMenuBackgroundColor;
+    
+    _mainView.presentation = presentation;
+    
+    [(TGNavigationBar *)_masterNavigationController.navigationBar setPallete:presentation.navigationBarPallete];
+    [(TGNavigationBar *)_detailNavigationController.navigationBar setPallete:presentation.navigationBarPallete];
+    [_mainTabsController setPresentation:presentation];
+    [_contactsController setPresentation:presentation];
+    [_callsController setPresentation:presentation];
+    [_dialogListController setPresentation:presentation];
+    
+    if ([self.presentedViewController isKindOfClass:[TGNavigationController class]])
+    {
+        TGNavigationController *navController = (TGNavigationController *)self.presentedViewController;
+        [(TGNavigationBar *)navController.navigationBar setPallete:presentation.navigationBarPallete];
+    
+        for (UIViewController *controller in navController.viewControllers)
+        {
+            if ([controller respondsToSelector:@selector(setPresentation:)])
+                [controller performSelector:@selector(setPresentation:) withObject:presentation];
+        }
+        
+        if ([navController respondsToSelector:@selector(setPresentation:)])
+            [navController performSelector:@selector(setPresentation:) withObject:presentation];
+    }
+    
+    for (UIViewController *controller in _detailNavigationController.viewControllers)
+    {
+        if ([controller respondsToSelector:@selector(setPresentation:)])
+            [controller performSelector:@selector(setPresentation:) withObject:presentation];
+    }
+    
+    if (_contactsController.presentedViewController != nil)
+    {
+        if ([_contactsController.presentedViewController respondsToSelector:@selector(setPresentation:)])
+            [_contactsController.presentedViewController performSelector:@selector(setPresentation:) withObject:presentation];
+    }
+    
+    [TGProgressWindow setDarkStyle:presentation.pallete.isDark];
+    [TGProxyWindow setDarkStyle:presentation.pallete.isDark];
+    
+    _volumeBarView.presentation = presentation;
+}
+
 - (bool)shouldAutorotate {
     if (self.associatedWindowStack.count > 0) {
         return [[self.associatedWindowStack.lastObject rootViewController] shouldAutorotate];
@@ -102,9 +171,10 @@
 {
     [super loadView];
     
-    self.view.backgroundColor = UIColorRGBA(0xf2f2f5, 1.0f);
+    self.view.backgroundColor = self.presentation.pallete.collectionMenuBackgroundColor;
     
     _mainView = [[TGTabletMainView alloc] initWithFrame:self.view.bounds];
+    _mainView.presentation = self.presentation;
     _mainView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self.view addSubview:_mainView];
     
@@ -134,8 +204,28 @@
     
     if (!TGIsPad())
     {
-        _volumeBarView = [[TGVolumeBarView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 16.0f)];
-        _volumeBarView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        TGDispatchAfter(3.0, dispatch_get_main_queue(), ^
+        {
+            CGFloat inset = self.controllerSafeAreaInset.top > FLT_EPSILON ? self.controllerSafeAreaInset.top - 13.0f : 0.0f;
+            _volumeBarView = [[TGVolumeBarView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 16.0f + inset)];
+            _volumeBarView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            _volumeBarView.safeAreaInset = self.controllerSafeAreaInset;
+            _volumeBarView.presentation = self.presentation;
+        });
+    }
+}
+
+- (void)controllerInsetUpdated:(UIEdgeInsets)previousInset
+{
+    [super controllerInsetUpdated:previousInset];
+    if ([self isViewLoaded])
+    {
+        CGFloat inset = self.controllerSafeAreaInset.top > FLT_EPSILON ? self.controllerSafeAreaInset.top - 13.0f : 0.0f;
+        _volumeBarView.safeAreaInset = self.controllerSafeAreaInset;
+        _volumeBarView.frame = CGRectMake(0, 0, self.view.frame.size.width, 16.0f + inset);
+        
+        if (TGIsPad())
+            [_mainTabsController controllerInsetUpdated:self.controllerInset];
     }
 }
 
@@ -152,7 +242,16 @@
 - (void)replaceContentController:(UIViewController *)contentController {
     if (_currentSizeClass == UIUserInterfaceSizeClassCompact) {
         bool addDetail = _detailNavigationController.viewControllers.count == 0;
-        [_detailNavigationController setViewControllers:@[_mainTabsController, contentController] animated:true];
+        if (iosMajorVersion() >= 11 && _detailNavigationController.viewControllers.count == 1)
+        {
+            if (_detailNavigationController.viewControllers.firstObject != _mainTabsController)
+                [_detailNavigationController setViewControllers:@[_mainTabsController]];
+            [_detailNavigationController pushViewController:contentController animated:true];
+        }
+        else
+        {
+            [_detailNavigationController setViewControllers:@[_mainTabsController, contentController] animated:true];
+        }
         if (addDetail) {
             [self addDetailController];
         }
@@ -294,6 +393,13 @@
     }
 }
 
+- (void)resetControllers
+{
+    if (_masterNavigationController.viewControllers.count > 1)
+        [_masterNavigationController popToRootViewControllerAnimated:false];
+    [self clearContentControllers];
+}
+
 - (UIStatusBarStyle)preferredStatusBarStyle
 {
     if (_mainTabsController.presentedViewController != nil)
@@ -310,8 +416,8 @@
 
 - (BOOL)prefersStatusBarHidden
 {
-    //if (!TGIsPad() && UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation))
-    //    return true;
+    if (!TGIsPad() && iosMajorVersion() >= 11 && UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation))
+        return true;
     
     return [super prefersStatusBarHidden];
 }
@@ -328,6 +434,16 @@
         return true;
     
     if (fabs(self.view.frame.size.width - [UIScreen mainScreen].bounds.size.width) > FLT_EPSILON)
+        return true;
+    
+    return false;
+}
+
+- (bool)isSlideOver {
+    if (![self isSplitView])
+        return false;
+    
+    if (fabs(self.view.frame.size.height - [UIScreen mainScreen].bounds.size.height) > FLT_EPSILON)
         return true;
     
     return false;

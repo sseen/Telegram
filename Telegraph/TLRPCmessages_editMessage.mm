@@ -3,15 +3,13 @@
 #import "TL/TLMetaScheme.h"
 #import "TLMetaClassStore.h"
 
-//messages.editMessage flags:# no_webpage:flags.1?true peer:InputPeer id:int message:string entities:flags.3?Vector<MessageEntity> reply_markup:flags.2?ReplyMarkup = Updates
-
-//messages.editMessage flags:# no_webpage:flags.1?true peer:InputPeer id:int message:flags.11?string reply_markup:flags.2?ReplyMarkup entities:flags.3?Vector<MessageEntity> = Updates;
+//messages.editMessage flags:# no_webpage:flags.1?true stop_geo_live:flags.12?true peer:InputPeer id:int message:flags.11?string reply_markup:flags.2?ReplyMarkup entities:flags.3?Vector<MessageEntity> geo_point:flags.13?InputGeoPoint = Updates;
 
 @implementation TLRPCmessages_editMessage
 
 - (int32_t)TLconstructorSignature
 {
-    return 0xce91e4ca;
+    return 0xc000e4c8;
 }
 
 - (int32_t)TLconstructorName
@@ -31,7 +29,7 @@
 
 - (int)layerVersion
 {
-    return 48;
+    return 78;
 }
 
 - (void)setNo_webpage:(bool)no_webpage {
@@ -59,6 +57,10 @@
         [os writeString:_message];
     }
     
+    if (realFlags & (1 << 14)) {
+        TLMetaClassStore::serializeObject(os, _media, true);
+    }
+    
     if (realFlags & (1 << 3)) {
         int32_t vectorSignature = TL_UNIVERSAL_VECTOR_CONSTRUCTOR;
         [os writeInt32:vectorSignature];
@@ -67,6 +69,10 @@
         for (TLMessageEntity *entity in _entities) {
             TLMetaClassStore::serializeObject(os, entity, true);
         }
+    }
+    
+    if (realFlags & (1 << 13)) {
+        TLMetaClassStore::serializeObject(os, _geo_point, true);
     }
 }
 

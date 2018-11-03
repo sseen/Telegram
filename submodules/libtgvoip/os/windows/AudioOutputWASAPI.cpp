@@ -70,7 +70,7 @@ AudioOutputWASAPI::AudioOutputWASAPI(std::string deviceID){
 }
 
 AudioOutputWASAPI::~AudioOutputWASAPI(){
-	if(audioClient && isPlaying){
+	if(audioClient){
 		audioClient->Stop();
 	}
 
@@ -108,18 +108,12 @@ void AudioOutputWASAPI::Configure(uint32_t sampleRate, uint32_t bitsPerSample, u
 void AudioOutputWASAPI::Start(){
 	isPlaying=true;
 	if(!thread){
-		thread=CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)AudioOutputWASAPI::StartThread, this, 0, NULL);
+		thread=CreateThread(NULL, 0, AudioOutputWASAPI::StartThread, this, 0, NULL);
 	}
-	
-	if(audioClient)
-		audioClient->Start();
 }
 
 void AudioOutputWASAPI::Stop(){
 	isPlaying=false;
-
-	if(audioClient)
-		audioClient->Stop();
 }
 
 bool AudioOutputWASAPI::IsPlaying(){
@@ -201,7 +195,7 @@ void AudioOutputWASAPI::ActuallySetCurrentDevice(std::string deviceID){
 	currentDevice=deviceID;
 	HRESULT res;
 
-	if(audioClient && isPlaying){
+	if(audioClient){
 		res=audioClient->Stop();
 		CHECK_RES(res, "audioClient->Stop");
 	}
@@ -281,7 +275,9 @@ void AudioOutputWASAPI::ActuallySetCurrentDevice(std::string deviceID){
 	audioClient = audioClient2;
 #endif
 
-	res = audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST | 0x80000000/*AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM*/, 60 * 10000, 0, &format, NULL);
+	// {2C693079-3F59-49FD-964F-61C005EAA5D3}
+	const GUID guid = { 0x2c693079, 0x3f59, 0x49fd, { 0x96, 0x4f, 0x61, 0xc0, 0x5, 0xea, 0xa5, 0xd3 } };
+	res = audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST | 0x80000000/*AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM*/, 60 * 10000, 0, &format, &guid);
 	CHECK_RES(res, "audioClient->Initialize");
 
 	uint32_t bufSize;
@@ -318,13 +314,12 @@ void AudioOutputWASAPI::ActuallySetCurrentDevice(std::string deviceID){
 	CHECK_RES(res, "audioSessionControl->RegisterAudioSessionNotification");
 #endif
 
-	if(isPlaying)
-		audioClient->Start();
+	audioClient->Start();
 
 	LOGV("set current output device done");
 }
 
-DWORD AudioOutputWASAPI::StartThread(void* arg) {
+DWORD WINAPI AudioOutputWASAPI::StartThread(void* arg) {
 	((AudioOutputWASAPI*)arg)->RunThread();
 	return 0;
 }
@@ -372,7 +367,11 @@ void AudioOutputWASAPI::RunThread() {
 			
 			size_t bytesAvailable=framesAvailable*2;
 			while(bytesAvailable>remainingDataLen){
-				InvokeCallback(remainingData+remainingDataLen, 960*2);
+				if(isPlaying){
+					InvokeCallback(remainingData+remainingDataLen, 960*2);
+				}else{
+					memset(remainingData+remainingDataLen, 0, 960*2);
+				}
 				remainingDataLen+=960*2;
 			}
 			memcpy(data, remainingData, bytesAvailable);

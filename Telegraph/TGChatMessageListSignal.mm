@@ -1,13 +1,13 @@
 #import "TGChatMessageListSignal.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGDatabase.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 #import "TGTelegraph.h"
 
 #import "TGSharedPtrWrapper.h"
-
-#import "TGPeerIdAdapter.h"
 
 @interface TGChatMessageListAdapter : NSObject <ASWatcher>
 {
@@ -401,7 +401,7 @@
 {
     return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subscriber)
     {
-        [TGDatabaseInstance() transactionReadHistoryForPeerIds:[[NSSet alloc] initWithArray:@[@(peerId)]]];
+        [TGDatabaseInstance() transactionReadHistoryForPeerIds:@[[[TGReadPeerMessagesRequest alloc] initWithPeerId:peerId maxMessageIndex:nil date:0 length:0 unread:false]]];
         [subscriber putCompletion];
         
         return nil;

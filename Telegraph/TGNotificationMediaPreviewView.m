@@ -1,14 +1,11 @@
 #import "TGNotificationMediaPreviewView.h"
-#import "TGMessage.h"
 
-#import "TGImageUtils.h"
-#import "TGStringUtils.h"
-#import "TGFont.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGImageView.h"
+#import <LegacyComponents/TGImageView.h>
 #import "TGImageMessageViewModel.h"
 #import "TGVideoMessageViewModel.h"
-#import "TGRemoteImageView.h"
+#import <LegacyComponents/TGRemoteImageView.h>
 
 const int32_t TGNotificationMediaCornerRadius = 5;
 
@@ -65,10 +62,10 @@ const int32_t TGNotificationMediaCornerRadius = 5;
                 TGImageMediaAttachment *imageMedia = (TGImageMediaAttachment *)attachment;
                 
                 NSString *text = TGLocalized(@"Message.Photo");
-                if (imageMedia.caption.length > 0)
+                if (message.caption.length > 0)
                 {
                     _hasCaption = true;
-                    text = imageMedia.caption;
+                    text = message.caption;
                 }
                 
                 [self setIcon:[UIImage imageNamed:@"MediaPhoto"] text:text];
@@ -111,6 +108,9 @@ const int32_t TGNotificationMediaCornerRadius = 5;
                     if (legacyFilePath != nil)
                         [previewUri appendFormat:@"&legacy-file-path=%@", legacyFilePath];
                     
+                    if (message.messageLifetime > 0 && message.messageLifetime <= 60)
+                        [previewUri appendString:@"&secret=1"];
+                    
                     if (legacyThumbnailCacheUrl != nil)
                         [previewUri appendFormat:@"&legacy-thumbnail-cache-url=%@", [TGStringUtils stringByEscapingForURL:legacyThumbnailCacheUrl]];
                     
@@ -127,10 +127,10 @@ const int32_t TGNotificationMediaCornerRadius = 5;
             {
                 TGVideoMediaAttachment *video = (TGVideoMediaAttachment *)attachment;
                 NSString *text = video.roundMessage ? TGLocalized(@"Message.VideoMessage") : TGLocalized(@"Message.Video");
-                if (video.caption.length > 0)
+                if (message.caption.length > 0)
                 {
                     _hasCaption = true;
-                    text = video.caption;
+                    text = message.caption;
                 }
                 
                 [self setIcon:[UIImage imageNamed:@"MediaVideo"] text:text];
@@ -161,7 +161,7 @@ const int32_t TGNotificationMediaCornerRadius = 5;
                     if (legacyThumbnailCacheUri != nil)
                         [previewUri appendFormat:@"&legacy-thumbnail-cache-url=%@", legacyThumbnailCacheUri];
                     
-                    if (message.messageLifetime > 0 && message.messageLifetime <= 60 && message.layer >= 17)
+                    if (message.messageLifetime > 0 && message.messageLifetime <= 60)
                         [previewUri appendString:@"&secret=1"];
                     
                     [previewUri appendFormat:@"&flat=1&cornerRadius=%d", !video.roundMessage ? TGNotificationMediaCornerRadius : (int)imageSize.width / 2];
@@ -214,10 +214,11 @@ const int32_t TGNotificationMediaCornerRadius = 5;
             {
                 TGLocationMediaAttachment *locationAttachment = (TGLocationMediaAttachment *)attachment;
                 
-                [self setIcon:[UIImage imageNamed:@"MediaLocation"] text:TGLocalized(@"Message.Location")];
+                NSString *text = locationAttachment.period > 0 ? TGLocalized(@"Message.LiveLocation") : TGLocalized(@"Message.Location");
+                [self setIcon:[UIImage imageNamed:@"MediaLocation"] text:text];
                 
                 imageSize = CGSizeMake(240, 128);
-                _imageUri = [NSString stringWithFormat:@"map-thumbnail://?latitude=%f&longitude=%f&width=%d&height=%d&flat=1&cornerRadius=%" PRId32 "", locationAttachment.latitude, locationAttachment.longitude, (int)imageSize.width, (int)imageSize.height, TGNotificationMediaCornerRadius];
+                _imageUri = [NSString stringWithFormat:@"map-thumbnail://?latitude=%f&longitude=%f&width=%d&height=%d&flat=1&offset=-10&cornerRadius=%" PRId32 "", locationAttachment.latitude, locationAttachment.longitude, (int)imageSize.width, (int)imageSize.height, TGNotificationMediaCornerRadius];
             }
                 break;
                 

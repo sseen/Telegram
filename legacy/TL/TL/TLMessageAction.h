@@ -133,3 +133,26 @@
 
 @end
 
+@interface TLMessageAction$messageActionScreenshotTaken : TLMessageAction
+
+
+@end
+
+@interface TLMessageAction$messageActionCustomAction : TLMessageAction
+
+@property (nonatomic, retain) NSString *message;
+
+@end
+
+@interface TLMessageAction$messageActionBotAllowed : TLMessageAction
+
+@property (nonatomic, retain) NSString *domain;
+
+@end
+
+@interface TLMessageAction$messageActionSecureValuesSent : TLMessageAction
+
+@property (nonatomic, retain) NSArray *types;
+
+@end
+

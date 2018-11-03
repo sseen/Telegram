@@ -3,6 +3,7 @@
 #import "TLObject.h"
 #import "TLMetaRpc.h"
 
+@class NSArray_FileHash;
 
 @interface TLRPCupload_reuploadCdnFile : TLMetaRpc
 

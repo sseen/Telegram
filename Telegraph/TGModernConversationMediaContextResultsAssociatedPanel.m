@@ -1,25 +1,22 @@
 #import "TGModernConversationMediaContextResultsAssociatedPanel.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGBotContextResults.h"
-#import "TGImageUtils.h"
 
 #import "TGAnimatedMediaContextResultCell.h"
 
 #import "TGBotContextExternalResult.h"
 #import "TGBotContextMediaResult.h"
 
-#import "TGImageUtils.h"
-
-#import "TGBotContextResultAttachment.h"
-
 #import "TGExternalGifSearchResult.h"
 #import "TGExternalImageSearchResult.h"
 
 #import "TGBotSignals.h"
 
-#import "TGItemPreviewController.h"
-#import "TGItemMenuSheetPreviewView.h"
-#import "TGMenuSheetButtonItemView.h"
+#import <LegacyComponents/TGItemPreviewController.h>
+#import <LegacyComponents/TGItemMenuSheetPreviewView.h>
+#import <LegacyComponents/TGMenuSheetButtonItemView.h>
 #import "TGPreviewMenu.h"
 
 #import "TGModernConversationGenericContextResultsAssociatedPanelSwitchPm.h"
@@ -62,21 +59,18 @@
         UIColor *backgroundColor = [UIColor whiteColor];
         UIColor *bottomColor = UIColorRGBA(0xfafafa, 0.98f);
         UIColor *separatorColor = UIColorRGB(0xc5c7d0);
-        UIColor *cellSeparatorColor = UIColorRGB(0xdbdbdb);
         
         if (self.style == TGModernConversationAssociatedInputPanelDarkStyle)
         {
             backgroundColor = UIColorRGB(0x171717);
             bottomColor = backgroundColor;
             separatorColor = UIColorRGB(0x292929);
-            cellSeparatorColor = separatorColor;
         }
         else if (self.style == TGModernConversationAssociatedInputPanelDarkBlurredStyle)
         {
             backgroundColor = [UIColor clearColor];
             bottomColor = [UIColor clearColor];
             separatorColor = UIColorRGBA(0xb2b2b2, 0.7f);
-            cellSeparatorColor = separatorColor;
             
             CGFloat backgroundAlpha = 0.8f;
             if (iosMajorVersion() >= 8)
@@ -105,6 +99,9 @@
         _collectionLayout = [[UICollectionViewFlowLayout alloc] init];
         _collectionLayout.scrollDirection = UICollectionViewScrollDirectionHorizontal;
         _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:_collectionLayout];
+        if (iosMajorVersion() >= 11)
+            _collectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        _collectionView.tag = 0xbeef;
         _collectionView.delegate = self;
         _collectionView.dataSource = self;
         _collectionView.backgroundColor = [UIColor clearColor];
@@ -152,13 +149,24 @@
     [_loadMoreDisposable dispose];
 }
 
-- (TGItemPreviewController *)presentPreviewForResultIfAvailable:(TGBotContextResult *)result immediately:(bool)immediately
+- (void)setPallete:(TGConversationAssociatedInputPanelPallete *)pallete
 {
-    if (self.onResultPreview != nil)
-        self.onResultPreview();
+    [super setPallete:pallete];
+    if (self.pallete == nil)
+        return;
+    
+    self.backgroundColor = pallete.backgroundColor;
+    _stripeView.backgroundColor = pallete.barSeparatorColor;
+    _bottomView.backgroundColor = pallete.barBackgroundColor;
+    _separatorView.backgroundColor = pallete.barSeparatorColor;
+}
+
+- (TGItemPreviewController *)presentPreviewForResultIfAvailable:(TGBotContextResult *)result immediately:(bool)immediately
+{    
+    void (^resultPreviewDisappeared)(bool) = self.resultPreviewDisappeared;
     
     __weak TGModernConversationMediaContextResultsAssociatedPanel *weakSelf = self;
-    return [TGPreviewMenu presentInParentController:self.controller expandImmediately:immediately result:result results:_results sendAction:^(TGBotContextResult *result)
+    TGItemPreviewController *controller = [TGPreviewMenu presentInParentController:self.controller expandImmediately:immediately result:result results:_results sendAction:^(TGBotContextResult *result)
     {
         __strong TGModernConversationMediaContextResultsAssociatedPanel *strongSelf = weakSelf;
         if (strongSelf != nil && strongSelf.resultSelected != nil)
@@ -181,6 +189,16 @@
         
         return CGPointZero;
     } sourceView:nil sourceRect:nil];
+    controller.onDismiss = ^{
+        if (resultPreviewDisappeared != nil)
+            resultPreviewDisappeared(true);
+    };
+    if (controller != nil)
+    {
+        if (self.resultPreviewAppeared != nil)
+            self.resultPreviewAppeared();
+    }
+    return controller;
 }
 
 - (CGFloat)preferredHeight {
@@ -214,6 +232,7 @@
     if (results.switchPm != nil) {
         if (_switchPm == nil) {
             _switchPm = [[TGModernConversationGenericContextResultsAssociatedPanelSwitchPm alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.frame.size.width, 32.0f)];
+            [_switchPm setBackgroundColor:self.pallete.backgroundColor separatorColor:self.pallete.barSeparatorColor accentColor:self.pallete.accentColor];
             _switchPm.autoresizingMask = UIViewAutoresizingFlexibleWidth;
             __weak TGModernConversationMediaContextResultsAssociatedPanel *weakSelf = self;
             _switchPm.pressed = ^{
@@ -276,6 +295,15 @@
     [self scrollViewDidScroll:_collectionView];
 }
 
+- (void)setSafeAreaInset:(UIEdgeInsets)safeAreaInset
+{
+    if (!UIEdgeInsetsEqualToEdgeInsets(safeAreaInset, _safeAreaInset))
+    {
+        _safeAreaInset = safeAreaInset;
+        [_collectionView.collectionViewLayout invalidateLayout];
+    }
+}
+
 - (void)bindCellContents {
     for (NSIndexPath *indexPath in [_collectionView indexPathsForVisibleItems]) {
         TGAnimatedMediaContextResultCell *cell = (TGAnimatedMediaContextResultCell *)[_collectionView cellForItemAtIndexPath:indexPath];
@@ -328,9 +356,9 @@
 
 - (UIEdgeInsets)collectionView:(UICollectionView *)__unused collectionView layout:(UICollectionViewLayout *)__unused collectionViewLayout insetForSectionAtIndex:(NSInteger)__unused section {
     if (_stickers) {
-        return UIEdgeInsetsMake(4.0f, 12.0f, 4.0f, 12.0f);
+        return UIEdgeInsetsMake(4.0f, 12.0f + self.safeAreaInset.left, 4.0f, 12.0f + self.safeAreaInset.right);
     }
-    return UIEdgeInsetsMake(4.0f, 4.0f, 4.0f, 4.0f);
+    return UIEdgeInsetsMake(4.0f, 4.0f + self.safeAreaInset.left, 4.0f, 4.0f + self.safeAreaInset.right);
 }
 
 - (CGFloat)collectionView:(UICollectionView *)__unused collectionView layout:(UICollectionViewLayout *)__unused collectionViewLayout minimumInteritemSpacingForSectionAtIndex:(NSInteger)__unused section {
@@ -346,6 +374,7 @@
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     TGAnimatedMediaContextResultCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"TGAnimatedMediaContextResultCell" forIndexPath:indexPath];
+    [cell setSelectionColor:self.pallete.selectionColor];
     if (!_doNotBindContent) {
         [cell setResult:_results.results[indexPath.row]];
     }
@@ -370,7 +399,7 @@
             _loadingMore = true;
             TGBotContextResultsSwitchPm *switchPm = _results.switchPm;
             __weak TGModernConversationMediaContextResultsAssociatedPanel *weakSelf = self;
-            [_loadMoreDisposable setDisposable:[[[TGBotSignals botContextResultForUserId:_results.userId peerId:_results.peerId accessHash:_results.accessHash query:_results.query geoPoint:nil offset:_results.nextOffset] deliverOn:[SQueue mainQueue]] startWithNext:^(TGBotContextResults *nextResults) {
+            [_loadMoreDisposable setDisposable:[[[TGBotSignals botContextResultForUserId:_results.userId peerId:_results.peerId accessHash:_results.accessHash query:_results.query geoPoint:nil offset:_results.nextOffset forceAllowLocation:false] deliverOn:[SQueue mainQueue]] startWithNext:^(TGBotContextResults *nextResults) {
                 __strong TGModernConversationMediaContextResultsAssociatedPanel *strongSelf = weakSelf;
                 if (strongSelf != nil) {
                     TGBotContextResults *mergedResults = [[TGBotContextResults alloc] initWithUserId:strongSelf->_results.userId peerId:strongSelf->_results.peerId accessHash:strongSelf->_results.accessHash isMedia:strongSelf->_results.isMedia query:strongSelf->_results.query nextOffset:nextResults.nextOffset results:[strongSelf->_results.results arrayByAddingObjectsFromArray:nextResults.results] switchPm:switchPm];
@@ -396,6 +425,11 @@
     _collectionView.frame = CGRectMake(0.0f, separatorHeight + _switchPm.frame.size.height, self.frame.size.width, self.frame.size.height - separatorHeight - _switchPm.frame.size.height);
     
     _bottomView.frame = CGRectMake(0.0f, self.frame.size.height, self.frame.size.width, 4.0f);
+}
+
+- (bool)hasSelectedItem
+{
+    return _collectionView.indexPathsForSelectedItems.count != 0;
 }
 
 - (void)selectPreviousItem

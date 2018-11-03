@@ -1,15 +1,8 @@
 #import "TGModernConversationRestrictedInlineAssociatedPanel.h"
 
-#import "TGUser.h"
+#import <LegacyComponents/LegacyComponents.h>
 
-#import "TGMentionPanelCell.h"
-
-#import "TGImageUtils.h"
-#import "TGFont.h"
-
-#import "TGViewController.h"
-
-#import "TGLocalization.h"
+#import <LegacyComponents/TGMentionPanelCell.h>
 
 @interface TGModernConversationRestrictedInlineAssociatedPanel ()
 {
@@ -105,6 +98,15 @@
 }
 
 - (void)dealloc {
+}
+
+- (void)setPallete:(TGConversationAssociatedInputPanelPallete *)pallete
+{
+    [super setPallete:pallete];
+    
+    _backgroundView.backgroundColor = pallete.backgroundColor;
+    _stripeView.backgroundColor = pallete.barSeparatorColor;
+    _label.textColor = pallete.secondaryTextColor;
 }
 
 - (void)setFrame:(CGRect)frame

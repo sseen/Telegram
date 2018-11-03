@@ -1,9 +1,10 @@
 #import "TGPinnedMessageTitlePanel.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGModenConcersationReplyAssociatedPanel.h"
 
-#import "TGImageUtils.h"
-#import "TGFont.h"
+#import "TGPresentation.h"
 
 @interface TGPinnedMessageTitlePanel () {
     TGModenConcersationReplyAssociatedPanel *_replyPanel;
@@ -50,6 +51,15 @@
     return self;
 }
 
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    [super setPresentation:presentation];
+    
+    self.backgroundColor = presentation.pallete.barBackgroundColor;
+    _separatorView.backgroundColor = presentation.pallete.barSeparatorColor;
+    _replyPanel.pallete = presentation.associatedInputPanelPallete;
+}
+
 - (void)updateMessage:(TGMessage *)message {
     _message = message;
     [_replyPanel updateMessage:message];
@@ -61,7 +71,7 @@
     CGFloat separatorHeight = TGScreenPixel;
     _separatorView.frame = CGRectMake(0.0f, self.frame.size.height - separatorHeight, self.frame.size.width, separatorHeight);
     
-    _replyPanel.frame = CGRectMake(0.0f, TGRetinaPixel, self.frame.size.width, 44.0f);
+    _replyPanel.frame = CGRectMake(self.safeAreaInset.left, TGRetinaPixel, self.frame.size.width - self.safeAreaInset.left - self.safeAreaInset.right, 44.0f);
 }
 
 - (void)tapGesture:(UITapGestureRecognizer *)recognizer {

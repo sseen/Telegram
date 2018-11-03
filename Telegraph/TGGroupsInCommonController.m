@@ -1,18 +1,21 @@
 #import "TGGroupsInCommonController.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGDatabase.h"
 #import "TGUserSignal.h"
 
 #import "TGConversationCollectionItem.h"
 #import "TGInterfaceManager.h"
 
-#import "TGPeerIdAdapter.h"
 #import "TGChannelManagementSignals.h"
 #import "TGGroupManagementSignals.h"
 #import "TGModernConversationController.h"
 #import "TGGenericModernConversationCompanion.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
+
+#import "TGPreviewPresentationHelper.h"
 
 static NSArray<TGConversation *> *sortedConversations(NSArray<TGConversation *> *conversations) {
     return conversations;
@@ -185,6 +188,15 @@ static NSArray<TGConversation *> *sortedConversations(NSArray<TGConversation *> 
             previewingContext.sourceRect = [self.view convertRect:CGRectInset(cell.frame, 0.0f, 1.0f) fromView:self.collectionView];
             
             TGModernConversationController *controller = [[TGInterfaceManager instance] configuredPreviewConversationControlerWithId:item.conversation.conversationId];
+            controller.onViewDidAppear = ^
+            {
+                [TGPreviewPresentationHelper stylePreviewActionSheet];
+            };
+            TGDispatchAfter(0.1, dispatch_get_main_queue(), ^
+            {
+                [TGPreviewPresentationHelper stylePreviewActionSheet];
+            });
+            
             return controller;
         }
     }

@@ -172,6 +172,9 @@
     else if ([forwardPeer isKindOfClass:[TGBridgeChat class]])
         authorName = ((TGBridgeChat *)forwardPeer).groupTitle;
     
+    if (authorName == nil)
+        authorName = @"";
+    
     NSMutableAttributedString *forwardAttributedText = [[NSMutableAttributedString alloc] initWithString:authorName attributes:@{ NSFontAttributeName: [UIFont systemFontOfSize:12], NSForegroundColorAttributeName:textColor }];
     
     NSRange formatNameRange = NSMakeRange(0, authorName.length);
@@ -428,7 +431,7 @@
             
         case TGBridgeMessageActionGroupMigratedTo:
         {
-            messageText = TGLocalized(@"Notification.GroupMigratedToChannel");
+            messageText = TGLocalized(@"Notification.ChannelMigratedFrom");
         }
             break;
             

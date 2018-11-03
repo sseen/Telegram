@@ -8,8 +8,9 @@
 #define LIBTGVOIP_ECHOCANCELLER_H
 
 #include "threading.h"
-#include "BufferPool.h"
+#include "Buffers.h"
 #include "BlockingQueue.h"
+#include "MediaStreamItf.h"
 
 namespace tgvoip{
 class EchoCanceller{
@@ -22,16 +23,17 @@ public:
 	void SpeakerOutCallback(unsigned char* data, size_t len);
 	void Enable(bool enabled);
 	void ProcessInput(unsigned char* data, unsigned char* out, size_t len);
+	void SetAECStrength(int strength);
 
 private:
 	bool enableAEC;
 	bool enableAGC;
 	bool enableNS;
+	bool isOn;
 #ifndef TGVOIP_NO_DSP
-	static void* StartBufferFarendThread(void* arg);
-	void RunBufferFarendThread();
+	void RunBufferFarendThread(void* arg);
 	bool didBufferFarend;
-	tgvoip_mutex_t aecMutex;
+	Mutex aecMutex;
 	void* aec;
 	void* splittingFilter; // webrtc::SplittingFilter
 	void* splittingFilterIn; // webrtc::IFChannelBuffer
@@ -39,7 +41,7 @@ private:
 	void* splittingFilterFarend; // webrtc::SplittingFilter
 	void* splittingFilterFarendIn; // webrtc::IFChannelBuffer
 	void* splittingFilterFarendOut; // webrtc::IFChannelBuffer
-	tgvoip_thread_t bufferFarendThread;
+	Thread* bufferFarendThread;
 	BlockingQueue<int16_t*>* farendQueue;
 	BufferPool* farendBufferPool;
 	bool running;
@@ -48,6 +50,29 @@ private:
 	int32_t agcMicLevel;
 #endif
 };
-}
+
+	class AudioEffect{
+	public:
+		virtual ~AudioEffect()=0;
+		virtual void Process(int16_t* inOut, size_t numSamples)=0;
+		virtual void SetPassThrough(bool passThrough);
+	protected:
+		bool passThrough;
+	};
+
+	class AutomaticGainControl : public AudioEffect{
+	public:
+		AutomaticGainControl();
+		virtual ~AutomaticGainControl();
+		virtual void Process(int16_t* inOut, size_t numSamples);
+
+	private:
+		void* agc;
+		void* splittingFilter;
+		void* splittingFilterIn;
+		void* splittingFilterOut;
+		int32_t agcMicLevel;
+	};
+};
 
 #endif //LIBTGVOIP_ECHOCANCELLER_H

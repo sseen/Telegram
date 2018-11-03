@@ -2,6 +2,7 @@
 #import "TGShareRecipientController.h"
 
 #import <LegacyDatabase/LegacyDatabase.h>
+#import <MobileCoreServices/MobileCoreServices.h>
 
 #import "TGShareVideoConverter.h"
 
@@ -36,7 +37,7 @@
     if (self != nil)
     {
         self.viewControllers = @[ [[TGShareRecipientController alloc] init] ];
-        [self.navigationBar setTintColor:TGColorWithHex(0x007ee5)];
+        [self.navigationBar setTintColor:[UIColor hexColor:0x007ee5]];
     }
     return self;
 }
@@ -69,6 +70,12 @@
     {
         return [SSignal single:[[TGUnauthorizedShareContext alloc] init]];
     }]];
+    
+    NSArray *tmpFiles = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:NSTemporaryDirectory() error:nil];
+    for (NSString *path in tmpFiles) {
+        NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:path];
+        unlink([filePath UTF8String]);
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated
@@ -159,8 +166,26 @@
     NSInteger providerIndex = 0;
     NSInteger providerCount = dataSignals.count;
     
+    NSMutableArray *urlsToDelete = [[NSMutableArray alloc] init];
+    
+    bool delayProgressShowup = false;
+    
+    for (NSExtensionItem *item in _items)
+    {
+        for (NSItemProvider *provider in item.attachments)
+        {
+            if ([provider hasItemConformingToTypeIdentifier:(NSString *)kUTTypeVCard])
+            {
+                delayProgressShowup = true;
+                break;
+            }
+        }
+    }
+    
     for (SSignal *dataSignal in dataSignals)
     {
+        NSNumber *zeroProgress = @((providerIndex + 0.0f) / providerCount);
+        
         SSignal *sendSignal = [dataSignal mapToSignal:^SSignal *(id value)
         {
             __strong TGShareController *strongSelf = weakSelf;
@@ -179,9 +204,16 @@
                 UIImage *image = description[@"image"];
                 if (image != nil)
                 {
-                    image = TGScaleImage(image, TGFitSize(CGSizeMake(image.size.width * image.scale, image.size.height * image.scale), CGSizeMake(1280.0f, 1280.0f)));
-                    NSData *imageData = UIImageJPEGRepresentation(image, 0.54f);
-                    uploadMediaSignal = [TGUploadMediaSignals uploadPhotoWithContext:strongSelf->_currentShareContext data:imageData];
+                    SSignal *imageDataSignal = [SSignal defer:^SSignal *{
+                        UIImage *scaledImage = TGScaleImage(image, TGFitSize(CGSizeMake(image.size.width * image.scale, image.size.height * image.scale), CGSizeMake(1280.0f, 1280.0f)));
+                        NSData *imageData = UIImageJPEGRepresentation(scaledImage, 0.54f);
+                        return [SSignal single:imageData];
+                    }];
+
+                    uploadMediaSignal = [[SSignal single:@0] then:[imageDataSignal mapToSignal:^SSignal *(NSData *imageData)
+                    {
+                        return [TGUploadMediaSignals uploadPhotoWithContext:strongSelf->_currentShareContext data:imageData];
+                    }]];
                 }
             }
             else if (description[@"data"] != nil)
@@ -203,25 +235,32 @@
                     }
                     if (isGif)
                     {
-                        uploadMediaSignal = [TGUploadMediaSignals uploadFileWithContext:strongSelf->_currentShareContext data:data name:fileName == nil ? @"animation.gif" : fileName mimeType:@"image/gif" attributes:@[ [Api69_DocumentAttribute documentAttributeAnimated], [Api69_DocumentAttribute documentAttributeImageSizeWithW:@((int32_t)image.size.width) h:@((int32_t)image.size.height)] ]];
+                        uploadMediaSignal = [[SSignal single:@0] then:[TGUploadMediaSignals uploadFileWithContext:strongSelf->_currentShareContext data:data name:fileName == nil ? @"animation.gif" : fileName mimeType:@"image/gif" attributes:@[ [Api86_DocumentAttribute documentAttributeAnimated], [Api86_DocumentAttribute documentAttributeImageSizeWithW:@((int32_t)image.size.width) h:@((int32_t)image.size.height)]]]];
                     }
                     else
                     {
-                        image = TGScaleImage(image, TGFitSize(CGSizeMake(image.size.width * image.scale, image.size.height * image.scale), CGSizeMake(1280.0f, 1280.0f)));
-                        NSData *imageData = UIImageJPEGRepresentation(image, 0.54f);
-                        uploadMediaSignal = [TGUploadMediaSignals uploadPhotoWithContext:strongSelf->_currentShareContext data:imageData];
+                        SSignal *imageDataSignal = [SSignal defer:^SSignal *{
+                            UIImage *scaledImage = TGScaleImage(image, TGFitSize(CGSizeMake(image.size.width * image.scale, image.size.height * image.scale), CGSizeMake(1280.0f, 1280.0f)));
+                            NSData *imageData = UIImageJPEGRepresentation(scaledImage, 0.54f);
+                            return [SSignal single:imageData];
+                        }];
+                        
+                        uploadMediaSignal = [[SSignal single:@0] then:[imageDataSignal mapToSignal:^SSignal *(NSData *imageData)
+                        {
+                            return [TGUploadMediaSignals uploadPhotoWithContext:strongSelf->_currentShareContext data:imageData];
+                        }]];
                     }
                 }
                 else
                 {
                     uploadMediaSignal = [TGUploadMediaSignals uploadFileWithContext:strongSelf->_currentShareContext data:data name:fileName == nil ? @"file" : fileName mimeType:mimeType == nil ? @"application/octet-stream" : mimeType attributes:@[]];
                 }
-
             }
             else if (description[@"video"] != nil)
             {
                 AVURLAsset *asset = description[@"video"];
-                uploadMediaSignal = [[TGShareVideoConverter convertAVAsset:asset] mapToSignal:^SSignal *(id value)
+                bool isRoundMessage = [description[@"isRoundMessage"] boolValue];
+                uploadMediaSignal = [[TGShareVideoConverter convertAVAsset:asset preset:isRoundMessage ? TGMediaVideoConversionPresetVideoMessage : TGMediaVideoConversionPresetCompressedMedium] mapToSignal:^SSignal *(id value)
                 {
                     if ([value isKindOfClass:[NSDictionary class]])
                     {
@@ -231,6 +270,8 @@
                         if (error != nil)
                             return [SSignal fail:nil];
                         
+                        [urlsToDelete addObject:desc[@"fileUrl"]];
+                        
                         UIImage *resizedThumbnail = desc[@"previewImage"];
                         resizedThumbnail = TGScaleImage(resizedThumbnail, TGFitSize(resizedThumbnail.size, CGSizeMake(90, 90)));
                         NSData *thumbnailData = UIImageJPEGRepresentation(resizedThumbnail, 0.6);
@@ -238,7 +279,7 @@
                         int32_t duration = (int32_t)[desc[@"duration"] doubleValue];
                         CGSize dimensions = [desc[@"dimensions"] CGSizeValue];
                         
-                        return [[TGUploadMediaSignals uploadVideoWithContext:strongSelf->_currentShareContext data:videoData thumbData:thumbnailData duration:duration width:dimensions.width height:dimensions.height mimeType:desc[@"mimeType"]] map:^id(id value)
+                        return [[TGUploadMediaSignals uploadVideoWithContext:strongSelf->_currentShareContext data:videoData thumbData:thumbnailData duration:duration width:dimensions.width height:dimensions.height mimeType:desc[@"mimeType"] roundMessage:isRoundMessage] map:^id(id value)
                         {
                             if ([value isKindOfClass:[NSNumber class]])
                                 return @(0.5f + [value floatValue] / 2.0f);
@@ -255,6 +296,7 @@
                         return [SSignal single:value];
                     }
                 }];
+                uploadMediaSignal = [[SSignal single:@0] then:uploadMediaSignal];
             }
             else if (description[@"audio"] != nil)
             {
@@ -293,27 +335,30 @@
                 }
                 
                 NSMutableArray *attributes = [[NSMutableArray alloc] init];
-                [attributes addObject:[Api69_DocumentAttribute_documentAttributeAudio documentAttributeAudioWithFlags:@(flags) duration:description[@"duration"] title:title performer:artist waveform:waveform]];
+                [attributes addObject:[Api86_DocumentAttribute_documentAttributeAudio documentAttributeAudioWithFlags:@(flags) duration:description[@"duration"] title:title performer:artist waveform:waveform]];
                 
                 uploadMediaSignal = [TGUploadMediaSignals uploadFileWithContext:strongSelf->_currentShareContext data:audioData name:fileName mimeType:description[@"mimeType"] attributes:attributes];
+                uploadMediaSignal = [[SSignal single:@0] then:uploadMediaSignal];
             }
             else if (description[@"text"] != nil)
             {
                 NSString *text = description[@"text"];
-                return [SSignal single:[[TGUploadedMessageContentText alloc] initWithText:text]];
+                return [[SSignal single:zeroProgress] then:[SSignal single:[[TGUploadedMessageContentText alloc] initWithText:text]]];
             }
             else if (description[@"url"] != nil)
             {
                 NSURL *url = (NSURL *)description[@"url"];
+                SSignal *signal = [SSignal single:zeroProgress];
                 if ([TGShareLocationSignals isLocationURL:url])
-                    return [TGShareLocationSignals locationMessageContentForURL:url];
+                    signal = [signal then:[TGShareLocationSignals locationMessageContentForURL:url]];
                 else
-                    return [SSignal single:[[TGUploadedMessageContentText alloc] initWithText:url.absoluteString]];
+                    signal = [signal then:[SSignal single:[[TGUploadedMessageContentText alloc] initWithText:url.absoluteString]]];
+                return signal;
             }
             else if (description[@"contact"] != nil)
             {
                 TGContactModel *contact = (TGContactModel *)description[@"contact"];
-                return [TGShareContactSignals contactMessageContentForContact:contact parentController:strongSelf];
+                return [TGShareContactSignals contactMessageContentForContact:contact parentController:strongSelf context:strongSelf->_currentShareContext];
             }
             
             if (uploadMediaSignal == nil)
@@ -325,8 +370,13 @@
                 if (strongSelf == nil)
                     return [SSignal fail:nil];
                 
-                if ([next isKindOfClass:[Api69_InputMedia class]])
+                if ([next isKindOfClass:[Api86_InputMedia class]])
                 {
+                    for (NSURL *url in urlsToDelete)
+                    {
+                        [[NSFileManager defaultManager] removeItemAtURL:url error:nil];
+                    }
+                    
                     return [SSignal single:[[TGUploadedMessageContentMedia alloc] initWithInputMedia:next]];
                 }
                 else
@@ -400,10 +450,14 @@
     _progressAlert.text = NSLocalizedString(@"Share.Sharing", nil);
     _progressAlert.alpha = 0.0f;
     [self.view addSubview:_progressAlert];
-    [UIView animateWithDuration:0.3 animations:^
+    
+    if (!delayProgressShowup)
     {
-        _progressAlert.alpha = 1.0f;
-    }];
+        [UIView animateWithDuration:0.3 animations:^
+        {
+            _progressAlert.alpha = 1.0f;
+        }];
+    }
     
     _progressAlert.cancel = ^
     {
@@ -429,12 +483,20 @@
     {
     }] startWithNext:^(id next)
     {
-        if ([next respondsToSelector:@selector(floatValue)])
+        __strong TGShareController *strongSelf = weakSelf;
+        if (strongSelf == nil)
+            return;
+        
+        if (strongSelf->_progressAlert.alpha < FLT_EPSILON)
         {
-            __strong TGShareController *strongSelf = weakSelf;
-            if (strongSelf != nil)
-                [strongSelf->_progressAlert setProgress:[next floatValue] animated:true];
+            [UIView animateWithDuration:0.3 animations:^
+            {
+                strongSelf->_progressAlert.alpha = 1.0f;
+            }];
         }
+        
+        if ([next respondsToSelector:@selector(floatValue)])
+            [strongSelf->_progressAlert setProgress:[next floatValue] animated:true];
     } error:^(id error)
     {
         NSLog(@"error: %@", error);

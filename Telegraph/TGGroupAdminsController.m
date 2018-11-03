@@ -1,6 +1,6 @@
 #import "TGGroupAdminsController.h"
 
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 #import "TGGroupManagementSignals.h"
 
 #import "TGDatabase.h"
@@ -11,11 +11,13 @@
 
 #import "TGGroupInfoUserCollectionItem.h"
 
-#import "TGSearchBar.h"
-#import "TGSearchDisplayMixin.h"
+#import <LegacyComponents/TGSearchBar.h>
+#import <LegacyComponents/TGSearchDisplayMixin.h>
 
 #import "TGBotUserInfoController.h"
 #import "TGTelegraphUserInfoController.h"
+
+#import "TGPresentation.h"
 
 @interface TGGroupAdminsController () <ASWatcher, TGSearchBarDelegate> {
     int64_t _peerId;
@@ -117,6 +119,7 @@
     _searchBarWrapper.backgroundColor = [UIColor whiteColor];
     
     _searchBar = [[TGSearchBar alloc] initWithFrame:CGRectMake(0.0f, 20, _searchBarWrapper.frame.size.width, [TGSearchBar searchBarBaseHeight]) style:TGSearchBarStyleLightPlain];
+    [_searchBar setPallete:self.presentation.searchBarPallete];
     _searchBar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _searchBar.customBackgroundView.image = nil;
     _searchBar.customActiveBackgroundView.image = nil;

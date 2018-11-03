@@ -1,9 +1,6 @@
 #import "TGPreviewAboutItemView.h"
 
-#import "TGFont.h"
-
-#import "TGWebPageMediaAttachment.h"
-#import "TGLocationMediaAttachment.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 const CGFloat TGPreviewAboutItemViewMargin = 21.0f;
 
@@ -116,6 +113,15 @@ const CGFloat TGPreviewAboutItemViewMargin = 21.0f;
             _subtitleLabel.alpha = 1.0f;
         }];
     }
+}
+
+- (void)setPallete:(TGMenuSheetPallete *)pallete
+{
+    [super setPallete:pallete];
+    
+    _titleLabel.textColor = pallete.textColor;
+    _subtitleLabel.textColor = pallete.secondaryTextColor;
+    _indicatorView.color = pallete.secondaryTextColor;
 }
 
 - (CGFloat)preferredHeightForWidth:(CGFloat)width screenHeight:(CGFloat)__unused screenHeight

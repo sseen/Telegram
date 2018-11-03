@@ -1,6 +1,8 @@
 #import "TGSeparatorCollectionItemView.h"
 
-#import "TGImageUtils.h"
+#import <LegacyComponents/LegacyComponents.h>
+
+#import "TGPresentation.h"
 
 @interface TGSeparatorCollectionItemView () {
     UIView *_separatorView;
@@ -18,6 +20,13 @@
         [self.contentView addSubview:_separatorView];
     }
     return self;
+}
+
+- (void)setPresentation:(TGPresentation *)presentation
+{
+    [super setPresentation:presentation];
+    
+    _separatorView.backgroundColor = presentation.pallete.collectionMenuSeparatorColor;
 }
 
 - (void)layoutSubviews {

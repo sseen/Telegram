@@ -1,25 +1,22 @@
 #import "TGModernConversationComplexMediaContextResultsAssociatedPanel.h"
 
+#import <LegacyComponents/LegacyComponents.h>
+
 #import "TGBotContextResults.h"
-#import "TGImageUtils.h"
 
 #import "TGAnimatedMediaContextResultCell.h"
 
 #import "TGBotContextExternalResult.h"
 #import "TGBotContextMediaResult.h"
 
-#import "TGImageUtils.h"
-
-#import "TGBotContextResultAttachment.h"
-
 #import "TGExternalGifSearchResult.h"
 #import "TGExternalImageSearchResult.h"
 
 #import "TGBotSignals.h"
 
-#import "TGItemPreviewController.h"
-#import "TGItemMenuSheetPreviewView.h"
-#import "TGMenuSheetButtonItemView.h"
+#import <LegacyComponents/TGItemPreviewController.h>
+#import <LegacyComponents/TGItemMenuSheetPreviewView.h>
+#import <LegacyComponents/TGMenuSheetButtonItemView.h>
 #import "TGPreviewMenu.h"
 
 #import "TGModernConversationGenericContextResultsAssociatedPanelSwitchPm.h"
@@ -70,21 +67,18 @@
         UIColor *backgroundColor = [UIColor whiteColor];
         UIColor *bottomColor = UIColorRGBA(0xfafafa, 0.98f);
         UIColor *separatorColor = UIColorRGB(0xc5c7d0);
-        UIColor *cellSeparatorColor = UIColorRGB(0xdbdbdb);
         
         if (self.style == TGModernConversationAssociatedInputPanelDarkStyle)
         {
             backgroundColor = UIColorRGB(0x171717);
             bottomColor = backgroundColor;
             separatorColor = UIColorRGB(0x292929);
-            cellSeparatorColor = separatorColor;
         }
         else if (self.style == TGModernConversationAssociatedInputPanelDarkBlurredStyle)
         {
             backgroundColor = [UIColor clearColor];
             bottomColor = [UIColor clearColor];
             separatorColor = UIColorRGBA(0xb2b2b2, 0.7f);
-            cellSeparatorColor = separatorColor;
             
             CGFloat backgroundAlpha = 0.8f;
             if (iosMajorVersion() >= 8)
@@ -120,6 +114,8 @@
         _collectionLayout.scrollDirection = UICollectionViewScrollDirectionVertical;
         
         _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:_collectionLayout];
+        if (iosMajorVersion() >= 11)
+            _collectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
         _collectionView.delegate = self;
         _collectionView.dataSource = self;
         _collectionView.backgroundColor = nil;
@@ -159,34 +155,7 @@
                 return nil;
             
             TGBotContextResult *result = strongSelf->_results.results[indexPath.item];
-            CGPoint (^sourcePoint)(id) = ^CGPoint(__unused id item)
-            {
-                __strong TGModernConversationComplexMediaContextResultsAssociatedPanel *strongSelf = weakSelf;
-                if (strongSelf == nil)
-                    return CGPointZero;
-                
-                for (TGAnimatedMediaContextResultCell *cell in strongSelf->_collectionView.visibleCells)
-                {
-                    if ([cell.result isEqual:result])
-                    {
-                        NSIndexPath *indexPath = [strongSelf->_collectionView indexPathForCell:cell];
-                        if (indexPath != nil)
-                            return [strongSelf->_collectionView convertPoint:cell.center toView:nil];
-                    }
-                }
-                
-                return CGPointZero;
-            };
-            
-            if (strongSelf.onResultPreview != nil)
-                strongSelf.onResultPreview();
-            
-            return [TGPreviewMenu presentInParentController:strongSelf.controller expandImmediately:false result:result results:strongSelf->_results sendAction:^(TGBotContextResult *result)
-            {
-                __strong TGModernConversationComplexMediaContextResultsAssociatedPanel *strongSelf = weakSelf;
-                if (strongSelf != nil && strongSelf.resultSelected != nil)
-                    strongSelf.resultSelected(strongSelf->_results, result);
-            } sourcePointForItem:sourcePoint sourceView:nil sourceRect:nil];
+            return [strongSelf presentPreviewForResultIfAvailable:result immediately:false];
         }];
     }
     return self;
@@ -196,13 +165,26 @@
     [_loadMoreDisposable dispose];
 }
 
+- (void)setPallete:(TGConversationAssociatedInputPanelPallete *)pallete
+{
+    [super setPallete:pallete];
+    if (self.pallete == nil)
+        return;
+    
+    self.backgroundColor = pallete.backgroundColor;
+    _stripeView.backgroundColor = pallete.barSeparatorColor;
+    _tableViewBackground.backgroundColor = pallete.backgroundColor;
+    _tableViewSeparator.backgroundColor = pallete.barSeparatorColor;
+    _bottomView.backgroundColor = pallete.barBackgroundColor;
+    _separatorView.backgroundColor = pallete.barSeparatorColor;
+}
+
 - (TGItemPreviewController *)presentPreviewForResultIfAvailable:(TGBotContextResult *)result immediately:(bool)immediately
 {
-    if (self.onResultPreview != nil)
-        self.onResultPreview();
+    void (^resultPreviewDisappeared)(bool) = self.resultPreviewDisappeared;
     
     __weak TGModernConversationComplexMediaContextResultsAssociatedPanel *weakSelf = self;
-    return [TGPreviewMenu presentInParentController:self.controller expandImmediately:immediately result:result results:_results sendAction:^(TGBotContextResult *result)
+    TGItemPreviewController *controller = [TGPreviewMenu presentInParentController:self.controller expandImmediately:immediately result:result results:_results sendAction:^(TGBotContextResult *result)
     {
         __strong TGModernConversationComplexMediaContextResultsAssociatedPanel *strongSelf = weakSelf;
         if (strongSelf != nil && strongSelf.resultSelected != nil)
@@ -225,6 +207,16 @@
         
         return CGPointZero;
     } sourceView:nil sourceRect:nil];
+    controller.onDismiss = ^{
+        if (resultPreviewDisappeared != nil)
+            resultPreviewDisappeared(true);
+    };
+    if (controller != nil)
+    {
+        if (self.resultPreviewAppeared != nil)
+            self.resultPreviewAppeared();
+    }
+    return controller;
 }
 
 - (bool)fillsAvailableSpace {
@@ -287,6 +279,7 @@
     if (results.switchPm != nil) {
         if (_switchPm == nil) {
             _switchPm = [[TGModernConversationGenericContextResultsAssociatedPanelSwitchPm alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.frame.size.width, 32.0f)];
+            [_switchPm setBackgroundColor:self.pallete.backgroundColor separatorColor:self.pallete.barSeparatorColor accentColor:self.pallete.accentColor];
             _switchPm.autoresizingMask = UIViewAutoresizingFlexibleWidth;
             __weak TGModernConversationComplexMediaContextResultsAssociatedPanel *weakSelf = self;
             _switchPm.pressed = ^{
@@ -442,7 +435,7 @@
             _loadingMore = true;
             TGBotContextResultsSwitchPm *switchPm = _results.switchPm;
             __weak TGModernConversationComplexMediaContextResultsAssociatedPanel *weakSelf = self;
-            [_loadMoreDisposable setDisposable:[[[TGBotSignals botContextResultForUserId:_results.userId peerId:_results.peerId accessHash:_results.accessHash query:_results.query geoPoint:nil offset:_results.nextOffset] deliverOn:[SQueue mainQueue]] startWithNext:^(TGBotContextResults *nextResults) {
+            [_loadMoreDisposable setDisposable:[[[TGBotSignals botContextResultForUserId:_results.userId peerId:_results.peerId accessHash:_results.accessHash query:_results.query geoPoint:nil offset:_results.nextOffset forceAllowLocation:false] deliverOn:[SQueue mainQueue]] startWithNext:^(TGBotContextResults *nextResults) {
                 __strong TGModernConversationComplexMediaContextResultsAssociatedPanel *strongSelf = weakSelf;
                 if (strongSelf != nil) {
                     TGBotContextResults *mergedResults = [[TGBotContextResults alloc] initWithUserId:strongSelf->_results.userId peerId:strongSelf->_results.peerId accessHash:strongSelf->_results.accessHash isMedia:strongSelf->_results.isMedia query:strongSelf->_results.query nextOffset:nextResults.nextOffset results:[strongSelf->_results.results arrayByAddingObjectsFromArray:nextResults.results] switchPm:switchPm];
@@ -552,6 +545,11 @@
 
 - (CGRect)tableBackgroundFrame {
     return _tableViewBackground.frame;
+}
+
+- (bool)hasSelectedItem
+{
+    return _collectionView.indexPathsForSelectedItems.count != 0;
 }
 
 - (void)selectPreviousItem

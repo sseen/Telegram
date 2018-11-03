@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 
 @class TGDialogListRecentPeers;
+@class TGPresentation;
 
 @interface TGDialogListRecentPeersCell : UITableViewCell
 
@@ -9,6 +10,8 @@
 @property (nonatomic, copy) void (^peerLongTap)(id);
 
 @property (nonatomic) bool expanded;
+@property (nonatomic, assign) UIEdgeInsets safeAreaInset;
+@property (nonatomic, strong) TGPresentation *presentation;
 
 + (CGFloat)heightForWidth:(CGFloat)width count:(NSInteger)count expanded:(bool)expanded;
 

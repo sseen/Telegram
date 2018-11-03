@@ -1,6 +1,6 @@
 #import "TGBackspaceTextField.h"
 
-#import "TGFont.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 @interface TGBackspaceTextField ()
 
@@ -28,9 +28,15 @@
     _customPlaceholderLabel.font = [UIFont systemFontOfSize:15];
     [_customPlaceholderLabel sizeToFit];
     _customPlaceholderLabel.userInteractionEnabled = false;
-    _customPlaceholderLabel.textColor = UIColorRGB(0x8e8e93);
+    _customPlaceholderLabel.textColor = self.placeholderColor;
     
     [self setTextAlignment:NSTextAlignmentLeft];
+}
+
+- (void)setPlaceholderColor:(UIColor *)placeholderColor
+{
+    [super setPlaceholderColor:placeholderColor];
+    _customPlaceholderLabel.textColor = placeholderColor;
 }
 
 - (void)setShowPlaceholder:(bool)showPlaceholder animated:(bool)animated

@@ -1,10 +1,10 @@
 #import "TGChannelLinkSetupController.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 
 #import "TGDatabase.h"
 #import "TGTelegraph.h"
-#import "ActionStage.h"
+#import <LegacyComponents/ActionStage.h>
 
 #import "TGCollectionMenuSection.h"
 #import "TGCommentCollectionItem.h"
@@ -12,7 +12,7 @@
 
 #import "TGCollectionMenuLayout.h"
 
-#import "TGAlertView.h"
+#import "TGCustomAlertView.h"
 
 #import "TGChannelManagementSignals.h"
 #import "TGGroupManagementSignals.h"
@@ -21,7 +21,7 @@
 
 #import "TGRevokeLinkConversationItem.h"
 
-#import "TGProgressWindow.h"
+#import <LegacyComponents/TGProgressWindow.h>
 
 typedef enum {
     TGUsernameControllerUsernameStateNone,
@@ -103,7 +103,7 @@ typedef enum {
         [strongSelf usernameChanged:username];
     };
     
-    TGCommentCollectionItem *commentItem = [[TGCommentCollectionItem alloc] initWithFormattedText:_conversation.isChannelGroup ? TGLocalized(@"Group.Username.Help") : TGLocalized(@"Channel.Username.Help")];
+    TGCommentCollectionItem *commentItem = [[TGCommentCollectionItem alloc] initWithFormattedText:TGLocalized(@"Channel.Username.Help")];
     commentItem.topInset = 1.0f;
     
     _invalidUsernameItem = [[TGCommentCollectionItem alloc] init];
@@ -123,7 +123,7 @@ typedef enum {
             if (strongSelf->_usernameItem.username.length != 0)
             {
                 [[UIPasteboard generalPasteboard] setString:[[NSString alloc] initWithFormat:@"http://t.me/%@", strongSelf->_usernameItem.username]];
-                [[[TGAlertView alloc] initWithTitle:nil message:TGLocalized(@"Username.LinkCopied") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil] show];
+                [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Username.LinkCopied") cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
             }
         }
     };
@@ -195,16 +195,16 @@ typedef enum {
         unichar c = [_usernameItem.username characterAtIndex:0];
         if (c >= '0' && c <= '9')
         {
-            [[[TGAlertView alloc] initWithTitle:_conversation.isChannelGroup ? TGLocalized(@"Group.Username.InvalidStartsWithNumber") : TGLocalized(@"Channel.Username.InvalidStartsWithNumber") message:nil cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:nil completionBlock:nil] show];
+            [TGCustomAlertView presentAlertWithTitle:_conversation.isChannelGroup ? TGLocalized(@"Group.Username.InvalidStartsWithNumber") : TGLocalized(@"Channel.Username.InvalidStartsWithNumber") message:nil cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:nil completionBlock:nil];
         }
         else
         {
-            [[[TGAlertView alloc] initWithTitle:TGLocalized(@"Username.InvalidCharacters") message:nil cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:nil completionBlock:nil] show];
+            [TGCustomAlertView presentAlertWithTitle:TGLocalized(@"Username.InvalidCharacters") message:nil cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:nil completionBlock:nil];
         }
     }
     else if (_usernameItem.username.length != 0 && _usernameItem.username.length < 5)
     {
-        [[[TGAlertView alloc] initWithTitle:_conversation.isChannelGroup ? TGLocalized(@"Group.Username.InvalidTooShort") : TGLocalized(@"Channel.Username.InvalidTooShort") message:nil cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:nil completionBlock:nil] show];
+        [TGCustomAlertView presentAlertWithTitle:_conversation.isChannelGroup ? TGLocalized(@"Group.Username.InvalidTooShort") : TGLocalized(@"Channel.Username.InvalidTooShort") message:nil cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:nil completionBlock:nil];
     }
     else
     {
@@ -230,7 +230,7 @@ typedef enum {
                     }] startWithNext:nil error:^(__unused id error) {
                         __strong TGChannelLinkSetupController *strongSelf = weakSelf;
                         if (strongSelf != nil) {
-                            [[[TGAlertView alloc] initWithTitle:TGLocalized(@"Username.InvalidTaken") message:nil cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil] show];
+                            [TGCustomAlertView presentAlertWithTitle:TGLocalized(@"Username.InvalidTaken") message:nil cancelButtonTitle:TGLocalized(@"Common.OK") okButtonTitle:nil completionBlock:nil];
                         }
                     } completed:^{
                         __strong TGChannelLinkSetupController *strongSelf = weakSelf;
@@ -244,11 +244,11 @@ typedef enum {
         };
         
         if (_usernameItem.username.length != 0 && _conversation.username.length == 0) {
-            [[[TGAlertView alloc] initWithTitle:nil message:TGLocalized(@"Channel.Edit.PrivatePublicLinkAlert") cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:TGLocalized(@"Common.OK") completionBlock:^(bool okButtonPressed) {
+            [TGCustomAlertView presentAlertWithTitle:nil message:TGLocalized(@"Channel.Edit.PrivatePublicLinkAlert") cancelButtonTitle:TGLocalized(@"Common.Cancel") okButtonTitle:TGLocalized(@"Common.OK") completionBlock:^(bool okButtonPressed) {
                 if (okButtonPressed) {
                     continueSetup();
                 }
-            }] show];;
+            }];
         } else {
             continueSetup();
         }
@@ -334,7 +334,7 @@ typedef enum {
                  [_invalidUsernameItem setTextColor:UIColorRGB(0xcf3030)];
                  break;
              case TGUsernameControllerUsernameStateTooManyUsernames:
-                 [_invalidUsernameItem setText:TGLocalized(@"Channel.Username.InvalidTooManyUsernames")];
+                 [_invalidUsernameItem setText:TGLocalized(@"Group.Username.RemoveExistingUsernamesInfo")];
                  _invalidUsernameItem.alpha = 1.0f;
                  _invalidUsernameItem.hidden = false;
                  _invalidUsernameItem.showProgress = false;
@@ -424,7 +424,7 @@ typedef enum {
     if (username.length == 0)
         _hintItem.text = nil;
     else
-        [_hintItem setFormattedText:[[NSString alloc] initWithFormat:_conversation.isChannelGroup ? TGLocalized(@"Group.Username.LinkHint") : TGLocalized(@"Channel.Username.LinkHint"), username]];
+        [_hintItem setFormattedText:[[NSString alloc] initWithFormat:TGLocalized(@"Channel.Username.LinkHint"), username]];
 }
 
 - (void)updateCanCreateUsernames {

@@ -706,3 +706,127 @@
 
 @end
 
+@implementation TLMessageAction$messageActionScreenshotTaken : TLMessageAction
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0x4792929b;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0x496da402;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)__unused metaObject
+{
+    TLMessageAction$messageActionScreenshotTaken *object = [[TLMessageAction$messageActionScreenshotTaken alloc] init];
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)__unused values
+{
+}
+
+
+@end
+
+@implementation TLMessageAction$messageActionCustomAction : TLMessageAction
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0xfae69f56;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0x45995670;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLMessageAction$messageActionCustomAction *object = [[TLMessageAction$messageActionCustomAction alloc] init];
+    object.message = metaObject->getString((int32_t)0xc43b7853);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypeString;
+        value.nativeObject = self.message;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0xc43b7853, value));
+    }
+}
+
+
+@end
+
+@implementation TLMessageAction$messageActionBotAllowed : TLMessageAction
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0xabe9affe;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0xe6f2dbf1;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLMessageAction$messageActionBotAllowed *object = [[TLMessageAction$messageActionBotAllowed alloc] init];
+    object.domain = metaObject->getString((int32_t)0x4bfcaf2c);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypeString;
+        value.nativeObject = self.domain;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x4bfcaf2c, value));
+    }
+}
+
+
+@end
+
+@implementation TLMessageAction$messageActionSecureValuesSent : TLMessageAction
+
+
+- (int32_t)TLconstructorSignature
+{
+    return (int32_t)0xd95c6154;
+}
+
+- (int32_t)TLconstructorName
+{
+    return (int32_t)0xc1f61281;
+}
+
+- (id<TLObject>)TLbuildFromMetaObject:(std::shared_ptr<TLMetaObject>)metaObject
+{
+    TLMessageAction$messageActionSecureValuesSent *object = [[TLMessageAction$messageActionSecureValuesSent alloc] init];
+    object.types = metaObject->getArray((int32_t)0x32251ae0);
+    return object;
+}
+
+- (void)TLfillFieldsWithValues:(std::map<int32_t, TLConstructedValue> *)values
+{
+    {
+        TLConstructedValue value;
+        value.type = TLConstructedValueTypeVector;
+        value.nativeObject = self.types;
+        values->insert(std::pair<int32_t, TLConstructedValue>((int32_t)0x32251ae0, value));
+    }
+}
+
+
+@end

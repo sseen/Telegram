@@ -7,8 +7,11 @@
  */
 
 #import <UIKit/UIKit.h>
+#import <SSignalKit/SSignalKit.h>
 
 #import "TGDialogListCellAssetsSource.h"
+
+@class TGPresentation;
 
 @interface TGDialogListSearchCell : UITableViewCell
 
@@ -22,12 +25,19 @@
 
 @property (nonatomic, strong) NSString *avatarUrl;
 
+@property (nonatomic) int isSavedMessages;
+
 @property (nonatomic) bool isChat;
 @property (nonatomic) bool isEncrypted;
 @property (nonatomic) bool isVerified;
+@property (nonatomic) bool hasExplicitContent;
 @property (nonatomic) int encryptedUserId;
 
 @property (nonatomic) int unreadCount;
+
+@property (nonatomic, strong) TGPresentation *presentation;
+
+@property (nonatomic) SMetaDisposable *channelDisposable;
 
 - (void)resetView:(bool)animated;
 

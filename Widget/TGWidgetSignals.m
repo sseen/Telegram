@@ -15,7 +15,6 @@ const NSTimeInterval TGWidgetUpdateThrottleInterval = 20.0;
 #pragma mark - Signal
 
 static SVariable *topPeersVar;
-static NSTimeInterval lastRefreshTime;
 static NSDictionary *cachedUnreadCounts;
 
 + (SSignal *)resultSignalWithContext:(id)context users:(NSArray *)users unreadCounts:(NSDictionary *)unreadCounts
@@ -58,7 +57,19 @@ static NSDictionary *cachedUnreadCounts;
             {
                 TGLegacyDatabase *database = ((TGShareContext *)context).legacyDatabase;
                 
-                NSArray *users = [database topUsers];
+                NSMutableArray *users = [[database topUsers] mutableCopy];
+                for (NSUInteger i = 0; i < users.count; i++)
+                {
+                    TGLegacyUser *user = users[i];
+                    if (user.userId == ((TGShareContext *)context).clientUserId)
+                    {
+                        [users removeObject:user];
+                        break;
+                    }
+                }
+                if (users.count > 8)
+                    [users removeLastObject];
+                
                 NSDictionary *unreadCounts = nil;
                 SSignal *resultSignal = nil;
                 
@@ -103,17 +114,17 @@ static NSDictionary *cachedUnreadCounts;
     NSMutableArray *peers = [[NSMutableArray alloc] init];
     for (TGLegacyUser *user in users)
     {
-        [peers addObject:[Api69_InputPeer inputPeerUserWithUserId:@(user.userId) accessHash:@(user.accessHash)]];
+        [peers addObject:[Api86_InputPeer inputPeerUserWithUserId:@(user.userId) accessHash:@(user.accessHash)]];
     }
     
-    return [[context function:[Api69 messages_getPeerDialogsWithPeers:peers]] map:^id(Api69_messages_PeerDialogs *dialogs)
+    return [[context function:[Api86 messages_getPeerDialogsWithPeers:peers]] map:^id(Api86_messages_PeerDialogs *dialogs)
     {
         NSMutableDictionary *counts = [[NSMutableDictionary alloc] init];
-        for (Api69_Dialog *dialog in dialogs.dialogs)
+        for (Api86_Dialog *dialog in dialogs.dialogs)
         {
             int32_t peerId = 0;
-            if ([dialog.peer isKindOfClass:[Api69_Peer_peerUser class]])
-                peerId = (int32_t)[[(Api69_Peer_peerUser *)dialog.peer userId] integerValue];
+            if ([dialog.peer isKindOfClass:[Api86_Peer_peerUser class]])
+                peerId = (int32_t)[[(Api86_Peer_peerUser *)dialog.peer userId] integerValue];
             
             if (peerId != 0)
                 counts[@(peerId)] = dialog.unreadCount;

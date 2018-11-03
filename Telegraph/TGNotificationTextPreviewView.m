@@ -1,7 +1,6 @@
 #import "TGNotificationTextPreviewView.h"
 
-#import "TGMessage.h"
-#import "TGConversation.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGScrollIndicatorView.h"
 
@@ -140,7 +139,7 @@
     CGSize contentSize = CGSizeMake(_textLabel.frame.size.width + 10.0f, _textHeight + _headerHeight);
     CGFloat maxContentHeight = [self maxContentHeight];
     
-    CGFloat maxScrollHeight = MIN(maxContentHeight, contentSize.height);
+    CGFloat maxScrollHeight = self.unnlimitedHeight ? contentSize.height : MIN(maxContentHeight, contentSize.height);
     CGFloat scrollHeight = _collapsedTextHeight + (maxScrollHeight - _collapsedTextHeight) * progress;
     
     if (!CGSizeEqualToSize(_scrollView.contentSize, contentSize))
@@ -152,7 +151,7 @@
     CGFloat textOffset = (_textEndPos - _textStartPos) * progress + titleOffset;
     _textLabel.frame = CGRectMake(0, textOffset, _textLabel.frame.size.width, (_expandProgress > FLT_EPSILON) ? _textHeight : _collapsedTextHeight);
     
-    bool contentClipped = (contentSize.height > maxContentHeight);
+    bool contentClipped = !self.unnlimitedHeight && (contentSize.height > maxContentHeight);
     [_scrollIndicator setHidden:!contentClipped animated:false];
     _scrollView.userInteractionEnabled = contentClipped;
 }

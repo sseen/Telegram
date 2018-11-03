@@ -1,4 +1,6 @@
-#import "TGMenuSheetItemView.h"
+#import <LegacyComponents/TGMenuSheetItemView.h>
+
+@class TGPresentation;
 
 @interface TGShareCollectionItemView : TGMenuSheetItemView
 
@@ -9,6 +11,8 @@
 
 @property (nonatomic, readonly) NSArray *peerIds;
 @property (nonatomic, assign) bool hasActionButton;
+
+@property (nonatomic, strong) TGPresentation *presentation;
 
 - (void)searchBegan;
 - (void)searchEnded:(bool)reload;

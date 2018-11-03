@@ -7,7 +7,9 @@
 #import "TGMessage+Telegraph.h"
 #import "TGUserDataRequestBuilder.h"
 
-#import "TGPeerIdAdapter.h"
+#import "TLRPCmessages_search.h"
+
+#import "TLRPCmessages_search.h"
 
 @implementation TGMessageSearchSignals
 
@@ -75,7 +77,7 @@
 
 + (SSignal *)searchPeer:(int64_t)peer accessHash:(int64_t)accessHash query:(NSString *)query filter:(TGMessageSearchFilter)filter maxMessageId:(int32_t)maxMessageId limit:(NSUInteger)limit around:(bool)around
 {
-    TLRPCmessages_search$messages_search *search = [[TLRPCmessages_search$messages_search alloc] init];
+    TLRPCmessages_search *search = [[TLRPCmessages_search alloc] init];
     search.peer = [TGTelegraphInstance createInputPeerForConversation:peer accessHash:accessHash];
     search.q = query == nil ? @"" : query;
     search.filter = [self nativeFilterForFilter:filter];
@@ -88,6 +90,7 @@
     }
     search.max_id = maxMessageId;
     search.limit = (int32_t)limit;
+    search.from_id = [[TLInputUser$inputUserEmpty alloc] init];
     
     return [[[TGTelegramNetworking instance] requestSignal:search] map:^id (TLmessages_Messages *result)
     {
@@ -136,7 +139,7 @@
     }];
 }
 
-+ (SSignal *)shareLinkForChannelMessage:(int64_t)peerId accessHash:(int64_t)accessHash messageId:(int32_t)messageId {
++ (SSignal *)shareLinkForChannelMessage:(int64_t)peerId accessHash:(int64_t)accessHash messageId:(int32_t)messageId grouped:(bool)grouped {
     TLRPCchannels_exportMessageLink$channels_exportMessageLink *exportMessageLink = [[TLRPCchannels_exportMessageLink$channels_exportMessageLink alloc] init];
     TLInputChannel$inputChannel *inputChannel = [[TLInputChannel$inputChannel alloc] init];
     inputChannel.channel_id = TGChannelIdFromPeerId(peerId);
@@ -144,6 +147,7 @@
     exportMessageLink.channel = inputChannel;
     
     exportMessageLink.n_id = messageId;
+    exportMessageLink.grouped = grouped;
     
     if (false) {
         return [[[TGDatabaseInstance() existingChannel:peerId] take:1] map:^id(TGConversation *conversation) {

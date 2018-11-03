@@ -1,7 +1,6 @@
 #import "TGGenericPeerMediaGalleryVideoItem.h"
 
-#import "TGMessage.h"
-#import "TGImageInfo.h"
+#import <LegacyComponents/LegacyComponents.h>
 
 #import "TGGenericPeerMediaGalleryVideoItemView.h"
 
@@ -51,6 +50,9 @@
         
         [previewUri appendFormat:@"&messageId=%" PRId32 "", (int32_t)messageId];
         [previewUri appendFormat:@"&conversationId=%" PRId64 "", (int64_t)peerId];
+        
+        if (videoMedia.originInfo != nil)
+            [previewUri appendFormat:@"&origin_info=%@", [videoMedia.originInfo stringRepresentation]];
     }
     
     self = [super initWithMedia:videoMedia previewUri:previewUri];
@@ -58,6 +60,7 @@
     {
         _peerId = peerId;
         _messageId = messageId;
+        self.originInfo = videoMedia.originInfo;
     }
     return self;
 }
@@ -87,6 +90,9 @@
         
         [previewUri appendFormat:@"&messageId=%" PRId32 "", (int32_t)messageId];
         [previewUri appendFormat:@"&conversationId=%" PRId64 "", (int64_t)peerId];
+        
+        if (documentMedia.originInfo != nil)
+            [previewUri appendFormat:@"&origin_info=%@", [documentMedia.originInfo stringRepresentation]];
     }
     
     self = [super initWithMedia:documentMedia previewUri:previewUri];
@@ -94,8 +100,18 @@
     {
         _peerId = peerId;
         _messageId = messageId;
+        self.originInfo = documentMedia.originInfo;
     }
     return self;
+}
+
+- (NSArray *)textCheckingResults
+{
+    if (_textCheckingResults != nil)
+        return _textCheckingResults;
+    
+    _textCheckingResults = [TGMessage textCheckingResultsForText:_caption highlightMentionsAndTags:true highlightCommands:false entities:_entities];
+    return _textCheckingResults;
 }
 
 - (BOOL)isEqual:(id)object
